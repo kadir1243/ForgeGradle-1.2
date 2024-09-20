@@ -29,6 +29,7 @@ import org.gradle.api.plugins.ExtensionContainer;
 import org.gradle.api.provider.ListProperty;
 import org.gradle.api.tasks.*;
 
+import javax.inject.Inject;
 import java.io.*;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
@@ -123,6 +124,7 @@ public class DecompileTask extends CachedTask {
 
     @Classpath
     @InputFiles
+    @Inject
     public ConfigurableFileCollection getClassPath() {
         throw new UnsupportedOperationException("Not Injected");
     }
