@@ -21,15 +21,11 @@ import net.minecraftforge.gradle.patching.ContextualPatch.HunkReport;
 import net.minecraftforge.gradle.patching.ContextualPatch.PatchReport;
 import net.minecraftforge.gradle.patching.ContextualPatch.PatchStatus;
 import net.minecraftforge.gradle.tasks.abstractutil.CachedTask;
-import org.gradle.api.file.ConfigurableFileCollection;
 import org.gradle.api.file.FileCollection;
-import org.gradle.api.file.RegularFile;
 import org.gradle.api.logging.LogLevel;
 import org.gradle.api.plugins.ExtensionContainer;
-import org.gradle.api.provider.ListProperty;
 import org.gradle.api.tasks.*;
 
-import javax.inject.Inject;
 import java.io.*;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
@@ -115,17 +111,11 @@ public class DecompileTask extends CachedTask {
             JavaExecSpecHelper.setMainClass(exec, "-jar");
             exec.setWorkingDir(fernFlower.getParentFile());
 
-            exec.classpath(getClassPath());
+            exec.classpath(Constants.getClassPath());
             exec.setStandardOutput(Constants.getTaskLogStream(buildDir, getName() + ".log"));
 
             exec.setMaxHeapSize("512M");
         });
-    }
-
-    @Classpath
-    @Inject
-    public ConfigurableFileCollection getClassPath() {
-        throw new UnsupportedOperationException("Not Injected");
     }
 
     private void readJarAndFix(final File jar) throws IOException {
