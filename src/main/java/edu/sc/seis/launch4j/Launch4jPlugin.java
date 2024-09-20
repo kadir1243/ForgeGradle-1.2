@@ -41,6 +41,9 @@ public class Launch4jPlugin implements Plugin<Project> {
 
         Launch4jPluginExtension pluginExtension = new Launch4jPluginExtension();
         project.getExtensions().add("launch4j", pluginExtension);
+        if (!project.getPluginManager().hasPlugin("java")){
+            project.getPluginManager().apply(JavaPlugin.class);
+        }
 
         Task xmlTask = addCreateLaunch4jXMLTask(project, pluginExtension);
 

@@ -1,13 +1,16 @@
 package net.minecraftforge.gradle.tasks.dev;
 
 import groovy.lang.Closure;
+import net.minecraftforge.gradle.FileUtils;
 import net.minecraftforge.gradle.common.Constants;
 import net.minecraftforge.gradle.delayed.DelayedFile;
 import net.minecraftforge.gradle.delayed.DelayedString;
 import net.minecraftforge.gradle.json.JsonFactory;
 import net.minecraftforge.gradle.json.version.Library;
 import net.minecraftforge.gradle.json.version.Version;
+import net.minecraftforge.gradle.user.UserConstants;
 import org.gradle.api.DefaultTask;
+import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.tasks.*;
 
 import java.io.File;
@@ -61,57 +64,51 @@ public class GenDevProjectsTask extends DefaultTask {
     private void writeFile() throws IOException {
         File file = getProject().file(getTargetFile().call());
         file.getParentFile().mkdirs();
-        file.createNewFile();
-        file.setLastModified(System.currentTimeMillis());
+        FileUtils.updateDate(file);
 
         // prepare file string for writing.
         StringBuilder o = new StringBuilder();
 
         a(o,
-                "apply plugin: 'java' ",
+                "apply plugin: 'java'",
                 "apply plugin: 'eclipse'",
                 "",
                 "sourceCompatibility = '1.6'",
                 "targetCompatibility = '1.6'",
                 "",
-                "repositories",
-                "{",
-                "    maven",
-                "    {",
+                "repositories {",
+                "    maven {",
                 "        name 'forge'",
                 "        url 'https://maven.minecraftforge.net'",
                 "    }",
                 "    mavenCentral()",
-                "    maven",
-                "    {",
+                "    maven {",
                 "        name 'sonatypeSnapshot'",
                 "        url 'https://oss.sonatype.org/content/repositories/snapshots/'",
                 "    }",
-                "    maven",
-                "    {",
+                "    maven {",
                 "        name 'minecraft'",
                 "        url '" + Constants.LIBRARY_URL + "'",
                 "    }",
                 "}",
                 "",
-                "dependencies",
-                "{"
+                "dependencies {"
         );
 
         // read json, output json in gradle freindly format...
         for (String dep : deps) {
-            o.append("    compile '").append(dep).append('\'').append(NEWLINE);
+            o.append("    ").append(UserConstants.CONFIG_COMPILE).append(" '").append(dep).append('\'').append(NEWLINE);
         }
 
         String channel = getMappingChannel();
         String version = getMappingVersion();
         String mcversion = getMcVersion();
         if (version != null && channel != null) {
-            o.append("    compile group: 'de.oceanlabs.mcp', name:'mcp_").append(channel).append("', version:'").append(version).append('-').append(mcversion).append("', ext:'zip'");
+            o.append("    ").append(UserConstants.CONFIG_COMPILE).append(" group: 'de.oceanlabs.mcp', name:'mcp_").append(channel).append("', version:'").append(version).append('-').append(mcversion).append("', ext:'zip'");
         }
         a(o,
                 "",
-                "    testCompile 'junit:junit:4.5'",
+                "    " + JavaPlugin.TEST_IMPLEMENTATION_CONFIGURATION_NAME + " 'junit:junit:4.5'",
                 "}",
                 ""
         );
@@ -119,40 +116,33 @@ public class GenDevProjectsTask extends DefaultTask {
         URI base = targetDir.call().toURI();
 
         if (resources.size() > 0 || sources.size() > 0 || testSources.size() > 0 || testResources.size() > 0) {
-            a(o, "sourceSets");
-            a(o, "{");
-            a(o, "    main");
-            a(o, "    {");
+            a(o, "sourceSets {");
+            a(o, "    main {");
             if (sources.size() > 0) {
-                a(o, "        java");
-                a(o, "        {");
+                a(o, "        java {");
                 for (DelayedFile src : sources) {
                     o.append("            srcDir '").append(relative(base, src)).append('\'').append(NEWLINE);
                 }
                 a(o, "        }");
             }
             if (resources.size() > 0) {
-                a(o, "        resources");
-                a(o, "        {");
+                a(o, "        resources {");
                 for (DelayedFile src : resources) {
                     o.append("            srcDir '").append(relative(base, src)).append('\'').append(NEWLINE);
                 }
                 a(o, "        }");
             }
             a(o, "    }");
-            a(o, "    test");
-            a(o, "    {");
+            a(o, "    test {");
             if (testSources.size() > 0) {
-                a(o, "        java");
-                a(o, "        {");
+                a(o, "        java {");
                 for (DelayedFile src : testSources) {
                     o.append("            srcDir '").append(relative(base, src)).append('\'').append(NEWLINE);
                 }
                 a(o, "        }");
             }
             if (testResources.size() > 0) {
-                a(o, "        resources");
-                a(o, "        {");
+                a(o, "        resources {");
                 for (DelayedFile src : testResources) {
                     o.append("            srcDir '").append(relative(base, src)).append('\'').append(NEWLINE);
                 }

@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.function.Supplier;
 
 public class FileFilterTask extends DefaultTask {
     @InputFile
@@ -40,12 +41,13 @@ public class FileFilterTask extends DefaultTask {
         Files.write(getOutputFile().toPath(), input.getBytes(StandardCharsets.UTF_8));
     }
 
-    @SuppressWarnings("unchecked")
     private String toString(Object obj) {
-        if (obj instanceof Closure) {
-            return ((Closure<String>) obj).call();
+        if (obj instanceof Closure<?>) {
+            return toString(((Closure<?>) obj).call());
+        } else if (obj instanceof Supplier<?>) {
+            return toString(((Supplier<?>) obj).get());
         } else {
-            return (String) obj;
+            return obj.toString();
         }
     }
 

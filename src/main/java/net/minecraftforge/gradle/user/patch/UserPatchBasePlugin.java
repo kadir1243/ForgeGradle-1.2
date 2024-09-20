@@ -15,6 +15,7 @@ import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.api.tasks.SourceSet;
 import org.gradle.api.tasks.SourceSetContainer;
+import org.gradle.plugins.ide.eclipse.EclipsePlugin;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -66,7 +67,7 @@ public abstract class UserPatchBasePlugin extends UserBasePlugin<UserPatchExtens
         }
 
         // configure eclipse task to do extra stuff.
-        project.getTasks().getByName("eclipse").doLast(new Action<Task>() {
+        project.getTasks().getByName(EclipsePlugin.ECLIPSE_TASK_NAME).doLast(new Action<Task>() {
             @Override
             public void execute(Task arg0) {
                 // find the file

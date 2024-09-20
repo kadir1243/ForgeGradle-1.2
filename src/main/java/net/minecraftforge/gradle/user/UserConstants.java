@@ -1,6 +1,7 @@
 package net.minecraftforge.gradle.user;
 
 import net.minecraftforge.gradle.common.Constants;
+import org.gradle.api.plugins.JavaPlugin;
 
 public final class UserConstants {
     private UserConstants() {
@@ -14,9 +15,9 @@ public final class UserConstants {
     public static final String CONFIG_MC = "minecraft";
 
     // build configurations. same as in DevConstants
-    public static final String CONFIG_RUNTIME = "runtimeOnly";
-    public static final String CONFIG_RUNTIME_CLASSPATH = "runtimeClasspath";
-    public static final String CONFIG_COMPILE = "implementation";
+    public static final String CONFIG_RUNTIME = JavaPlugin.RUNTIME_ONLY_CONFIGURATION_NAME;
+    public static final String CONFIG_RUNTIME_CLASSPATH = JavaPlugin.RUNTIME_CLASSPATH_CONFIGURATION_NAME;
+    public static final String CONFIG_COMPILE = JavaPlugin.IMPLEMENTATION_CONFIGURATION_NAME;
 
     static final String FORGE_JAVADOC_URL = Constants.FORGE_MAVEN + "/net/minecraftforge/forge/{API_VERSION}/forge-{API_VERSION}-javadoc.zip";
 

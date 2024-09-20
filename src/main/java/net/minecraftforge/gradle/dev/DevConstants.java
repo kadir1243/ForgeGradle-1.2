@@ -7,6 +7,10 @@ final class DevConstants {
     private DevConstants() {}
 
     static final String INSTALLER_URL = "https://maven.minecraftforge.net/net/minecraftforge/installer/{INSTALLER_VERSION}/installer-{INSTALLER_VERSION}-shrunk.jar";
+    /**
+     * @deprecated Not Available
+     */
+    @Deprecated
     static final String LAUNCH4J_URL = "https://files.minecraftforge.net/launch4j/launch4j-3.0.0-" + Constants.OPERATING_SYSTEM + "-" + Constants.SYSTEM_ARCH + ".zip";
 
     static final String DEOBF_DATA = "{CACHE_DIR}/minecraft/net/minecraft/minecraft_srg/{MC_VERSION}/deobfuscation_data-{MC_VERSION}.lzma";
@@ -121,7 +125,9 @@ final class DevConstants {
     static final String FML_RESOURCES = "{FML_DIR}/src/main/resources";
     static final String FML_TEST_SOURCES = "{FML_DIR}/src/test/java";
     static final String FML_TEST_RES = "{FML_DIR}/src/test/resources";
-    static final String FML_VERSIONF = "{FML_DIR}/build/tmp/fmlversion.properties";
+    static final String FML_VERSION = "{FML_DIR}/build/tmp/fmlversion.properties";
+    /**@deprecated typo*/
+    static final String FML_VERSIONF = FML_VERSION;
     static final String FML_LICENSE = "{FML_DIR}/LICENSE-fml.txt";
     static final String FML_CREDITS = "{FML_DIR}/CREDITS-fml.txt";
     static final String FML_LOGO = "{FML_DIR}/jsons/big_logo.png";
@@ -134,8 +140,12 @@ final class DevConstants {
     static final String FORGE_TEST_RES = "{FORGE_DIR}/src/test/resources";
     static final String FORGE_LICENSE = "{FORGE_DIR}/MinecraftForge-License.txt";
     static final String FORGE_CREDITS = "{FORGE_DIR}/MinecraftForge-Credits.txt";
-    static final String PAULSCODE_LISCENCE1 = "{FORGE_DIR}/Paulscode IBXM Library License.txt";
-    static final String PAULSCODE_LISCENCE2 = "{FORGE_DIR}/Paulscode SoundSystem CodecIBXM License.txt";
+    static final String PAULSCODE_LICENSE1 = "{FORGE_DIR}/Paulscode IBXM Library License.txt";
+    static final String PAULSCODE_LICENSE2 = "{FORGE_DIR}/Paulscode SoundSystem CodecIBXM License.txt";
+    /**@deprecated typo*/
+    static final String PAULSCODE_LISCENCE1 = PAULSCODE_LICENSE1;
+    /**@deprecated typo*/
+    static final String PAULSCODE_LISCENCE2 = PAULSCODE_LICENSE2;
     static final String FORGE_LOGO = FORGE_RESOURCES + "/forge_logo.png";
     static final String FORGE_VERSION_JAVA = FORGE_SOURCES + "/net/minecraftforge/common/ForgeVersion.java";
 

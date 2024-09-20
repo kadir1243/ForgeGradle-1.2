@@ -217,6 +217,22 @@ gradlePlugin {
             id = "liteloader"
             implementationClass = "net.minecraftforge.gradle.user.lib.LiteLoaderPlugin"
         }
+        create("cauldron") {
+            id = "cauldron"
+            implementationClass = "net.minecraftforge.gradle.dev.CauldronDevPlugin"
+        }
+        create("fmldev") {
+            id = "fmldev"
+            implementationClass = "net.minecraftforge.gradle.dev.FmlDevPlugin"
+        }
+        create("forgedev") {
+            id = "forgedev"
+            implementationClass = "net.minecraftforge.gradle.dev.ForgeDevPlugin"
+        }
+        create("mcedu") {
+            id = "mcedu"
+            implementationClass = "net.minecraftforge.gradle.dev.EduDevPlugin"
+        }
     }
 }
 

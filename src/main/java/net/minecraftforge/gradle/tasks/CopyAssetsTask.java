@@ -13,10 +13,11 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.Map.Entry;
+import java.util.function.Supplier;
 
 public class CopyAssetsTask extends DefaultTask {
     @Input
-    Closure<AssetIndex> assetIndex;
+    Supplier<AssetIndex> assetIndex;
 
     DelayedFile assetsDir;
 
@@ -57,10 +58,15 @@ public class CopyAssetsTask extends DefaultTask {
     }
 
     public AssetIndex getAssetIndex() {
-        return assetIndex.call();
+        return assetIndex.get();
     }
 
+    @Deprecated
     public void setAssetIndex(Closure<AssetIndex> assetIndex) {
+        this.assetIndex = assetIndex::call;
+    }
+
+    public void setAssetIndex(Supplier<AssetIndex> assetIndex) {
         this.assetIndex = assetIndex;
     }
 

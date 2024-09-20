@@ -7,12 +7,14 @@ import net.minecraftforge.gradle.StringUtils;
 import net.minecraftforge.gradle.json.version.OS;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
+import org.gradle.api.file.FileCollection;
 import org.gradle.api.specs.Spec;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
@@ -88,7 +90,7 @@ public class Constants {
     public static final String VERSION_JSON = JSONS_DIR + "/{MC_VERSION}.json";
 
     // util
-    public static final String NEWLINE = System.getProperty("line.separator");
+    public static final String NEWLINE = System.lineSeparator();
 
     // helper methods
     public static File cacheFile(Project project, String... otherFiles) {
@@ -105,6 +107,10 @@ public class Constants {
         return new File(othersJoined);
     }
 
+    /**
+     * @deprecated Not compatible with newer java versions
+     */
+    @Deprecated
     public static List<String> getClassPath() {
         URL[] urls = ((URLClassLoader) Constants.class.getClassLoader()).getURLs();
 
@@ -268,5 +274,32 @@ public class Constants {
             throw new RuntimeException("Resource " + resource + " not found");
 
         return url;
+    }
+
+    /**
+     * @deprecated It is better to switch off from this
+     */
+    @Deprecated // TODO: Find a replacement to this
+    public static <T extends Task> T executeTask(T task) {
+        if (task == null) return null;
+        for (Task dep : task.getTaskDependencies().getDependencies(task)) {
+            executeTask(dep);
+        }
+
+        if (!task.getState().getExecuted()) {
+            task.getLogger().lifecycle(task.getPath());
+            task.getActions().forEach(t -> t.execute(task));
+        }
+        return task;
+    }
+
+    public static URL[] toUrls(FileCollection collection) {
+        return collection.getFiles().stream().map(File::toURI).map(uri -> {
+            try {
+                return uri.toURL();
+            } catch (MalformedURLException e) {
+                throw new RuntimeException(e);
+            }
+        }).toArray(URL[]::new);
     }
 }

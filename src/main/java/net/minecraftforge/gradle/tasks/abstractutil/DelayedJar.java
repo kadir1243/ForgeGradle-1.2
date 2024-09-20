@@ -1,14 +1,12 @@
 package net.minecraftforge.gradle.tasks.abstractutil;
 
 import groovy.lang.Closure;
+import org.gradle.api.Action;
+import org.gradle.api.java.archives.Manifest;
 import org.gradle.api.tasks.bundling.Jar;
 
-/**
- * @deprecated not used anywhere
- */
-@Deprecated
 public class DelayedJar extends Jar {
-    private Closure<?> closure = null;
+    private Action<? super Manifest> closure = null;
 
     @Override
     public void copy() {
@@ -19,6 +17,15 @@ public class DelayedJar extends Jar {
     }
 
     public void setManifest(Closure<?> closure) {
-        this.closure = closure;
+        this.closure = new Action<Manifest>() {
+            @Override
+            public void execute(Manifest manifest) {
+                closure.call(manifest);
+            }
+        };
+    }
+
+    public void setManifest(Action<Manifest> action) {
+        this.closure = action;
     }
 }

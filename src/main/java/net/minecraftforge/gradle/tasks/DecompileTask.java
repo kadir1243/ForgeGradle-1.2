@@ -21,9 +21,12 @@ import net.minecraftforge.gradle.patching.ContextualPatch.HunkReport;
 import net.minecraftforge.gradle.patching.ContextualPatch.PatchReport;
 import net.minecraftforge.gradle.patching.ContextualPatch.PatchStatus;
 import net.minecraftforge.gradle.tasks.abstractutil.CachedTask;
+import org.gradle.api.file.ConfigurableFileCollection;
 import org.gradle.api.file.FileCollection;
+import org.gradle.api.file.RegularFile;
 import org.gradle.api.logging.LogLevel;
 import org.gradle.api.plugins.ExtensionContainer;
+import org.gradle.api.provider.ListProperty;
 import org.gradle.api.tasks.*;
 
 import java.io.*;
@@ -37,7 +40,7 @@ import java.util.zip.ZipOutputStream;
 
 import static net.minecraftforge.gradle.common.Constants.EXT_NAME_MC;
 
-public class DecompileTask extends CachedTask {
+public abstract class DecompileTask extends CachedTask {
     private final File buildDir = ProjectBuildDirHelper.getBuildDir(getProject());
     private final ExtensionContainer extensions = getProject().getExtensions();
     @InputFile
@@ -111,12 +114,16 @@ public class DecompileTask extends CachedTask {
             JavaExecSpecHelper.setMainClass(exec, "-jar");
             exec.setWorkingDir(fernFlower.getParentFile());
 
-            exec.classpath(Constants.getClassPath());
+            exec.classpath(getClassPath());
             exec.setStandardOutput(Constants.getTaskLogStream(buildDir, getName() + ".log"));
 
             exec.setMaxHeapSize("512M");
         });
     }
+
+    @Classpath
+    @InputFiles
+    public abstract ConfigurableFileCollection getClassPath();
 
     private void readJarAndFix(final File jar) throws IOException {
         // begin reading jar
@@ -362,10 +369,10 @@ public class DecompileTask extends CachedTask {
     /**
      * A private inner class to be used with the MCPPatches only.
      */
-    private class ContextProvider implements ContextualPatch.IContextProvider {
+    private static class ContextProvider implements ContextualPatch.IContextProvider {
         private Map<String, String> fileMap;
 
-        private final int STRIP = 1;
+        private static final int STRIP = 1;
 
         public ContextProvider(Map<String, String> fileMap) {
             this.fileMap = fileMap;

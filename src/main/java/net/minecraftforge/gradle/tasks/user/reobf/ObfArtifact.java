@@ -25,8 +25,6 @@ import org.gradle.api.tasks.bundling.AbstractArchiveTask;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
@@ -377,7 +375,7 @@ public class ObfArtifact implements PublishArtifact {
         JointProvider inheritanceProviders = new JointProvider();
         inheritanceProviders.add(new JarProvider(inputJar));
         if (classpath != null)
-            inheritanceProviders.add(new ClassLoaderProvider(new URLClassLoader(toUrls(classpath))));
+            inheritanceProviders.add(new ClassLoaderProvider(new URLClassLoader(Constants.toUrls(classpath))));
         mapping.setFallbackInheritanceProvider(inheritanceProviders);
 
         // remap jar
@@ -460,7 +458,7 @@ public class ObfArtifact implements PublishArtifact {
         @SuppressWarnings("unused")
         ClassLoader loader = BasePlugin.class.getClassLoader(); // dunno.. maybe this will load the classes??
         if (classpath != null) {
-            loader = new URLClassLoader(toUrls(classpath), BasePlugin.class.getClassLoader());
+            loader = new URLClassLoader(Constants.toUrls(classpath), BasePlugin.class.getClassLoader());
         }
 
         // the name provider
@@ -529,12 +527,4 @@ public class ObfArtifact implements PublishArtifact {
         Files.write(script.toPath(), String.join(Constants.NEWLINE, lines).getBytes(Charset.defaultCharset()));
     }
 
-    public static URL[] toUrls(FileCollection collection) throws MalformedURLException {
-        ArrayList<URL> urls = new ArrayList<>();
-
-        for (File file : collection.getFiles())
-            urls.add(file.toURI().toURL());
-
-        return urls.toArray(new URL[0]);
-    }
 }
