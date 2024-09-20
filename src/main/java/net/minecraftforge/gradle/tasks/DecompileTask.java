@@ -40,7 +40,7 @@ import java.util.zip.ZipOutputStream;
 
 import static net.minecraftforge.gradle.common.Constants.EXT_NAME_MC;
 
-public abstract class DecompileTask extends CachedTask {
+public class DecompileTask extends CachedTask {
     private final File buildDir = ProjectBuildDirHelper.getBuildDir(getProject());
     private final ExtensionContainer extensions = getProject().getExtensions();
     @InputFile
@@ -123,7 +123,9 @@ public abstract class DecompileTask extends CachedTask {
 
     @Classpath
     @InputFiles
-    public abstract ConfigurableFileCollection getClassPath();
+    public ConfigurableFileCollection getClassPath() {
+        throw new UnsupportedOperationException("Not Injected");
+    }
 
     private void readJarAndFix(final File jar) throws IOException {
         // begin reading jar

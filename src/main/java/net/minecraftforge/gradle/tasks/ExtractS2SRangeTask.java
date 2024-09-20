@@ -47,6 +47,7 @@ public class ExtractS2SRangeTask extends DefaultTask {
     private DelayedFile excOutput;
 
     // stuff defined on the tasks..
+    @InputFiles
     private final List<DelayedFile> in = new LinkedList<>();
 
     @OutputFile

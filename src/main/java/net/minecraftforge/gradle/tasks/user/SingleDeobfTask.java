@@ -22,9 +22,11 @@ import java.util.List;
 @CacheableTask
 public class SingleDeobfTask extends DefaultTask {
     @InputFile
+    @PathSensitive(PathSensitivity.RELATIVE)
     private DelayedFile inJar;
 
     @InputFile
+    @PathSensitive(PathSensitivity.RELATIVE)
     private DelayedFile srg;
 
     // getter is marked for input files
@@ -88,6 +90,7 @@ public class SingleDeobfTask extends DefaultTask {
 
     @InputFiles
     @Optional
+    @PathSensitive(PathSensitivity.ABSOLUTE)
     public FileCollection getClasspath() {
         return getProject().files(classpath.toArray());
     }
