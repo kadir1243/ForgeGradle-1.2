@@ -123,7 +123,6 @@ public class DecompileTask extends CachedTask {
     }
 
     @Classpath
-    @InputFiles
     @Inject
     public ConfigurableFileCollection getClassPath() {
         throw new UnsupportedOperationException("Not Injected");
