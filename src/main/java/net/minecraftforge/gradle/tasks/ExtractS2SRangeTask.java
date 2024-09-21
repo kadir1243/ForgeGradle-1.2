@@ -272,7 +272,7 @@ public class ExtractS2SRangeTask extends DefaultTask {
 
             if (includeJar) {
                 AbstractArchiveTask jarTask = (AbstractArchiveTask) proj.getTasks().getByName(JavaPlugin.JAR_TASK_NAME);
-                Constants.executeTask(jarTask);
+                Constants.executeTask(jarTask, getLogger());
                 File compiled = ArchiveTaskHelper.getArchivePath(jarTask);
                 libs = createFileCollection(compiled, libs);
 

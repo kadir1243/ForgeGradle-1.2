@@ -5,9 +5,11 @@ import groovy.lang.Closure;
 import net.minecraftforge.gradle.ProjectBuildDirHelper;
 import net.minecraftforge.gradle.StringUtils;
 import net.minecraftforge.gradle.json.version.OS;
+import org.gradle.api.Action;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.api.file.FileCollection;
+import org.gradle.api.logging.Logger;
 import org.gradle.api.specs.Spec;
 
 import java.io.File;
@@ -278,17 +280,29 @@ public class Constants {
 
     /**
      * @deprecated It is better to switch off from this
+     * @param task task to execute
+     * @param logger logger for logging thingies
+     * @return task that is executed
      */
     @Deprecated // TODO: Find a replacement to this
-    public static <T extends Task> T executeTask(T task) {
+    public static <T extends Task> T executeTask(T task, Logger logger) {
         if (task == null) return null;
         for (Task dep : task.getTaskDependencies().getDependencies(task)) {
-            executeTask(dep);
+            if (dep == null) continue;
+            executeTask(dep, logger);
         }
 
         if (!task.getState().getExecuted()) {
-            task.getLogger().lifecycle(task.getPath());
-            task.getActions().forEach(t -> t.execute(task));
+            logger.lifecycle(task.getPath());
+            for (Action<? super Task> t : task.getActions()) {
+                if (t == null) continue;
+                try {
+                    t.execute(task);
+                } catch (Exception e) {
+                    logger.error("Can not execute task {} because of {}", task.getName(), e.getMessage());
+                    throw new RuntimeException(e);
+                }
+            }
         }
         return task;
     }

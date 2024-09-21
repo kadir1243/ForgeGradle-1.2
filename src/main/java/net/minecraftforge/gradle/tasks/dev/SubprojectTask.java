@@ -31,19 +31,21 @@ public class SubprojectTask extends DefaultTask {
     @TaskAction
     public void doTask() throws IOException {
         Project childProj = FmlDevPlugin.getProject(getBuildFile(), getProject());
-
         // configure the project
+        getLogger().debug("Starting to Configure Projects");
         for (Action<Project> act : configureProject) {
             if (act != null)
                 act.execute(childProj);
         }
 
+        getLogger().debug("Starting to run tasks");
         for (String task : tasks.split(" ")) {
+            getLogger().debug("Running {} task", task);
             Set<Task> list = childProj.getTasksByName(task, false);
             for (Task t : list) {
                 if (configureTask != null)
                     configureTask.execute(t);
-                Constants.executeTask(t);
+                Constants.executeTask(t, getLogger());
             }
         }
     }

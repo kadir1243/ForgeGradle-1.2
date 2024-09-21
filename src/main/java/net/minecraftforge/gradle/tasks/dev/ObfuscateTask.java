@@ -67,7 +67,7 @@ public class ObfuscateTask extends DefaultTask {
 
         // executing jar task
         getLogger().debug("Executing child {} task...", subTask);
-        Constants.executeTask(jarTask);
+        Constants.executeTask(jarTask, getLogger());
 
         File inJar = ArchiveTaskHelper.getArchivePath(jarTask);
 
