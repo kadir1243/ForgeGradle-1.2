@@ -10,13 +10,13 @@ import net.minecraftforge.gradle.tasks.abstractutil.ExtractTask;
 import net.minecraftforge.gradle.tasks.abstractutil.FileFilterTask;
 import net.minecraftforge.gradle.tasks.dev.*;
 import org.gradle.api.Action;
-import org.gradle.api.DefaultTask;
-import org.gradle.api.Task;
 import org.gradle.api.file.ConfigurableFileTree;
 import org.gradle.api.file.DuplicatesStrategy;
 import org.gradle.api.java.archives.Manifest;
 import org.gradle.api.tasks.Delete;
+import org.gradle.api.tasks.bundling.AbstractArchiveTask;
 import org.gradle.api.tasks.bundling.Zip;
+import org.gradle.language.base.plugins.LifecycleBasePlugin;
 import org.gradle.plugins.ide.eclipse.EclipsePlugin;
 
 import java.io.File;
@@ -63,21 +63,20 @@ public class CauldronDevPlugin extends DevBasePlugin {
         createPackageTasks();
 
         // the master setup task.
-        Task task = makeTask("setupCauldron", DefaultTask.class);
-        task.dependsOn("extractCauldronSources", "generateProjects", EclipsePlugin.ECLIPSE_TASK_NAME, "copyAssets");
-        task.setGroup("Cauldron");
+        makeTask("setupCauldron", task -> {
+            task.dependsOn("extractCauldronSources", "generateProjects", EclipsePlugin.ECLIPSE_TASK_NAME, "copyAssets");
+            task.setGroup("Cauldron");
+        });
 
         // clean packages
-        {
-            Delete del = makeTask("cleanPackages", Delete.class);
-            del.delete("build/distributions");
-        }
+        makeTask("cleanPackages", Delete.class, task -> task.delete("build/distributions"));
 
-//        // the master task.
-        task = makeTask("buildPackages");
-        //task.dependsOn("launch4j", "createChangelog", "packageUniversal", "packageInstaller", "genJavadocs");
-        task.dependsOn("cleanPackages", "createChangelog", "packageUniversal", "packageInstaller");
-        task.setGroup("Cauldron");
+        // the master task.
+        makeTask("buildPackages", task -> {
+            //task.dependsOn("launch4j", "createChangelog", "packageUniversal", "packageInstaller", "genJavadocs");
+            task.dependsOn("cleanPackages", "createChangelog", "packageUniversal", "packageInstaller");
+            task.setGroup("Cauldron");
+        });
     }
 
     @Override
@@ -86,98 +85,89 @@ public class CauldronDevPlugin extends DevBasePlugin {
     }
 
     protected void createJarProcessTasks() {
-        ProcessJarTask task2 = makeTask("deobfuscateJar", ProcessJarTask.class);
-        {
-            task2.setInJar(delayedFile(Constants.JAR_MERGED));
-            task2.setOutCleanJar(delayedFile(JAR_SRG_CDN));
-            task2.setSrg(delayedFile(JOINED_SRG));
-            task2.setExceptorCfg(delayedFile(JOINED_EXC));
-            task2.setExceptorJson(delayedFile(EXC_JSON));
-            task2.addTransformerClean(delayedFile(FML_RESOURCES + "/fml_at.cfg"));
-            task2.addTransformerClean(delayedFile(FORGE_RESOURCES + "/forge_at.cfg"));
-            task2.setApplyMarkers(true);
-            task2.dependsOn("downloadMcpTools", "mergeJars");
-        }
+        makeTask("deobfuscateJar", ProcessJarTask.class, task -> {
+            task.setInJar(delayedFile(Constants.JAR_MERGED));
+            task.setOutCleanJar(delayedFile(JAR_SRG_CDN));
+            task.setSrg(delayedFile(JOINED_SRG));
+            task.setExceptorCfg(delayedFile(JOINED_EXC));
+            task.setExceptorJson(delayedFile(EXC_JSON));
+            task.addTransformerClean(delayedFile(FML_RESOURCES + "/fml_at.cfg"));
+            task.addTransformerClean(delayedFile(FORGE_RESOURCES + "/forge_at.cfg"));
+            task.setApplyMarkers(true);
+            task.dependsOn("downloadMcpTools", "mergeJars");
+        });
 
-        DecompileTask task3 = makeTask("decompile", DecompileTask.class);
-        {
-            task3.setInJar(delayedFile(JAR_SRG_CDN));
-            task3.setOutJar(delayedFile(ZIP_DECOMP_CDN));
-            task3.setFernFlower(delayedFile(Constants.FERNFLOWER));
-            task3.setPatch(delayedFile(MCP_PATCH_DIR));
-            task3.setAstyleConfig(delayedFile(ASTYLE_CFG));
-            task3.dependsOn("downloadMcpTools", "deobfuscateJar");
-        }
+        makeTask("decompile", DecompileTask.class, task -> {
+            task.setInJar(delayedFile(JAR_SRG_CDN));
+            task.setOutJar(delayedFile(ZIP_DECOMP_CDN));
+            task.setFernFlower(delayedFile(Constants.FERNFLOWER));
+            task.setPatch(delayedFile(MCP_PATCH_DIR));
+            task.setAstyleConfig(delayedFile(ASTYLE_CFG));
+            task.dependsOn("downloadMcpTools", "deobfuscateJar");
+        });
 
-        ProcessSrcJarTask task4 = makeTask("forgePatchJar", ProcessSrcJarTask.class);
-        {
-            task4.setInJar(delayedFile(ZIP_DECOMP_CDN));
-            task4.setOutJar(delayedFile(ZIP_FORGED_CDN));
-            task4.addStage("fml", delayedFile(FML_PATCH_DIR), delayedFile(FML_SOURCES), delayedFile(FML_RESOURCES), delayedFile("{FML_CONF_DIR}/patches/Start.java"), delayedFile(DEOBF_DATA), delayedFile(FML_VERSION));
-            task4.addStage("forge", delayedFile(FORGE_PATCH_DIR), delayedFile(FORGE_SOURCES), delayedFile(FORGE_RESOURCES));
-            task4.addStage("bukkit", null, delayedFile(BUKKIT_SOURCES));
-            task4.setDoesCache(false);
-            task4.setMaxFuzz(2);
-            task4.dependsOn("decompile", "compressDeobfData", "createVersionPropertiesFML");
-        }
+        makeTask("forgePatchJar", ProcessSrcJarTask.class, task -> {
+            task.setInJar(delayedFile(ZIP_DECOMP_CDN));
+            task.setOutJar(delayedFile(ZIP_FORGED_CDN));
+            task.addStage("fml", delayedFile(FML_PATCH_DIR), delayedFile(FML_SOURCES), delayedFile(FML_RESOURCES), delayedFile("{FML_CONF_DIR}/patches/Start.java"), delayedFile(DEOBF_DATA), delayedFile(FML_VERSION));
+            task.addStage("forge", delayedFile(FORGE_PATCH_DIR), delayedFile(FORGE_SOURCES), delayedFile(FORGE_RESOURCES));
+            task.addStage("bukkit", null, delayedFile(BUKKIT_SOURCES));
+            task.setDoesCache(false);
+            task.setMaxFuzz(2);
+            task.dependsOn("decompile", "compressDeobfData", "createVersionPropertiesFML");
+        });
 
-        RemapSourcesTask task6 = makeTask("remapCleanJar", RemapSourcesTask.class);
-        {
-            task6.setInJar(delayedFile(ZIP_FORGED_CDN));
-            task6.setOutJar(delayedFile(REMAPPED_CLEAN));
-            task6.setMethodsCsv(delayedFile(METHODS_CSV));
-            task6.setFieldsCsv(delayedFile(FIELDS_CSV));
-            task6.setParamsCsv(delayedFile(PARAMS_CSV));
-            task6.setDoesCache(true);
-            task6.setNoJavadocs();
-            task6.dependsOn("forgePatchJar");
-        }
+        makeTask("remapCleanJar", RemapSourcesTask.class, task -> {
+            task.setInJar(delayedFile(ZIP_FORGED_CDN));
+            task.setOutJar(delayedFile(REMAPPED_CLEAN));
+            task.setMethodsCsv(delayedFile(METHODS_CSV));
+            task.setFieldsCsv(delayedFile(FIELDS_CSV));
+            task.setParamsCsv(delayedFile(PARAMS_CSV));
+            task.setDoesCache(true);
+            task.setNoJavadocs();
+            task.dependsOn("forgePatchJar");
+        });
 
-        task4 = makeTask("cauldronPatchJar", ProcessSrcJarTask.class);
-        {
-            //task4.setInJar(delayedFile(ZIP_FORGED_CDN)); UNCOMMENT FOR SRG NAMES
-            task4.setInJar(delayedFile(REMAPPED_CLEAN));
-            task4.setOutJar(delayedFile(ZIP_PATCHED_CDN));
-            task4.addStage("Cauldron", delayedFile(EXTRA_PATCH_DIR));
-            task4.setDoesCache(false);
-            task4.setMaxFuzz(2);
-            task4.dependsOn("forgePatchJar", "remapCleanJar");
-        }
+        makeTask("cauldronPatchJar", ProcessSrcJarTask.class, task -> {
+            //task.setInJar(delayedFile(ZIP_FORGED_CDN)); UNCOMMENT FOR SRG NAMES
+            task.setInJar(delayedFile(REMAPPED_CLEAN));
+            task.setOutJar(delayedFile(ZIP_PATCHED_CDN));
+            task.addStage("Cauldron", delayedFile(EXTRA_PATCH_DIR));
+            task.setDoesCache(false);
+            task.setMaxFuzz(2);
+            task.dependsOn("forgePatchJar", "remapCleanJar");
+        });
 
-        task6 = makeTask("remapCauldronJar", RemapSourcesTask.class);
-        {
-            task6.setInJar(delayedFile(ZIP_PATCHED_CDN));
-            task6.setOutJar(delayedFile(ZIP_RENAMED_CDN));
-            task6.setMethodsCsv(delayedFile(METHODS_CSV));
-            task6.setFieldsCsv(delayedFile(FIELDS_CSV));
-            task6.setParamsCsv(delayedFile(PARAMS_CSV));
-            task6.setDoesCache(true);
-            task6.setNoJavadocs();
-            task6.dependsOn("cauldronPatchJar");
-        }
+        makeTask("remapCauldronJar", RemapSourcesTask.class, task -> {
+            task.setInJar(delayedFile(ZIP_PATCHED_CDN));
+            task.setOutJar(delayedFile(ZIP_RENAMED_CDN));
+            task.setMethodsCsv(delayedFile(METHODS_CSV));
+            task.setFieldsCsv(delayedFile(FIELDS_CSV));
+            task.setParamsCsv(delayedFile(PARAMS_CSV));
+            task.setDoesCache(true);
+            task.setNoJavadocs();
+            task.dependsOn("cauldronPatchJar");
+        });
     }
 
     private void createSourceCopyTasks() {
-        ExtractTask task = makeTask("extractCleanResources", ExtractTask.class);
-        {
+        makeTask("extractCleanResources", ExtractTask.class, task -> {
             task.exclude(JAVA_FILES);
             task.setIncludeEmptyDirs(false);
             task.from(delayedFile(REMAPPED_CLEAN));
             task.into(delayedFile(ECLIPSE_CLEAN_RES));
             task.dependsOn("extractWorkspace", "remapCleanJar");
-        }
+        });
 
-        task = makeTask("extractCleanSource", ExtractTask.class);
-        {
+        makeTask("extractCleanSource", ExtractTask.class, task -> {
             task.include(JAVA_FILES);
             task.setIncludeEmptyDirs(false);
             task.from(delayedFile(REMAPPED_CLEAN));
             task.into(delayedFile(ECLIPSE_CLEAN_SRC));
             task.dependsOn("extractCleanResources");
-        }
+        });
 
-        task = makeTask("extractCauldronResources", ExtractTask.class);
-        {
+        makeTask("extractCauldronResources", ExtractTask.class, task -> {
             task.exclude(JAVA_FILES);
             task.from(delayedFile(ZIP_RENAMED_CDN));
             task.into(delayedFile(ECLIPSE_CDN_RES));
@@ -192,10 +182,9 @@ public class CauldronDevPlugin extends DevBasePlugin {
 
                 return !tree.isEmpty();
             });
-        }
+        });
 
-        task = makeTask("extractCauldronSources", ExtractTask.class);
-        {
+        makeTask("extractCauldronSources", ExtractTask.class, task -> {
             task.include(JAVA_FILES);
             task.from(delayedFile(ZIP_RENAMED_CDN));
             task.into(delayedFile(ECLIPSE_CDN_SRC));
@@ -210,32 +199,29 @@ public class CauldronDevPlugin extends DevBasePlugin {
 
                 return !tree.isEmpty();
             });
-        }
+        });
     }
 
     private void createProjectTasks() {
-        FMLVersionPropTask sub = makeTask("createVersionPropertiesFML", FMLVersionPropTask.class);
-        {
-            //sub.setTasks("createVersionProperties");
-            //sub.setBuildFile(delayedFile("{FML_DIR}/build.gradle"));
-            sub.setVersion(() -> FmlDevPlugin.getVersionFromGit(project, new File(delayedString("{FML_DIR}").call())));
-            sub.setOutputFile(delayedFile(FML_VERSION));
-        }
+        makeTask("createVersionPropertiesFML", FMLVersionPropTask.class, task -> {
+            //task.setTasks("createVersionProperties");
+            //task.setBuildFile(delayedFile("{FML_DIR}/build.gradle"));
+            task.setVersion(() -> FmlDevPlugin.getVersionFromGit(project, new File(delayedString("{FML_DIR}").call())));
+            task.setOutputFile(delayedFile(FML_VERSION));
+        });
 
-        ExtractTask extract = makeTask("extractRes", ExtractTask.class);
-        {
-            extract.into(delayedFile(EXTRACTED_RES));
+        makeTask("extractRes", ExtractTask.class, task -> {
+            task.into(delayedFile(EXTRACTED_RES));
             for (File f : delayedFile("src/main").call().listFiles()) {
                 if (f.isDirectory())
                     continue;
                 String path = f.getAbsolutePath();
                 if (path.endsWith(".jar") || path.endsWith(".zip"))
-                    extract.from(delayedFile(path));
+                    task.from(delayedFile(path));
             }
-        }
+        });
 
-        GenDevProjectsTask task = makeTask("generateProjectClean", GenDevProjectsTask.class);
-        {
+        makeTask("generateProjectClean", GenDevProjectsTask.class, task -> {
             task.setTargetDir(delayedFile(ECLIPSE_CLEAN));
             task.setJson(delayedFile(EXTRA_JSON_DEV)); // Change to FmlConstants.JSON_BASE eventually, so that it's the base vanilla json
             task.addSource(delayedFile(ECLIPSE_CLEAN_SRC));
@@ -246,10 +232,9 @@ public class CauldronDevPlugin extends DevBasePlugin {
             task.setMappingVersion(delayedString("{MAPPING_VERSION}"));
 
             task.dependsOn("extractNatives");
-        }
+        });
 
-        task = makeTask("generateProjectCauldron", GenDevProjectsTask.class);
-        {
+        makeTask("generateProjectCauldron", GenDevProjectsTask.class, task -> {
             task.setJson(delayedFile(EXTRA_JSON_DEV));
             task.setTargetDir(delayedFile(ECLIPSE_CDN));
 
@@ -267,197 +252,182 @@ public class CauldronDevPlugin extends DevBasePlugin {
             task.setMappingVersion(delayedString("{MAPPING_VERSION}"));
 
             task.dependsOn("extractRes", "extractNatives", "createVersionPropertiesFML");
-        }
+        });
 
-        makeTask("generateProjects").dependsOn("generateProjectClean", "generateProjectCauldron");
+        makeTask("generateProjects", task -> task.dependsOn("generateProjectClean", "generateProjectCauldron"));
     }
 
     private void createEclipseTasks() {
-        SubprojectTask task = makeTask("eclipseClean", SubprojectTask.class);
-        {
+        makeTask("eclipseClean", SubprojectTask.class, task -> {
             task.setBuildFile(delayedFile(ECLIPSE_CLEAN + "/build.gradle"));
             task.setTasks(EclipsePlugin.ECLIPSE_TASK_NAME);
             task.dependsOn("extractCleanSource", "generateProjects");
-        }
+        });
 
-        task = makeTask("eclipseCauldron", SubprojectTask.class);
-        {
+        makeTask("eclipseCauldron", SubprojectTask.class, task -> {
             task.setBuildFile(delayedFile(ECLIPSE_CDN + "/build.gradle"));
             task.setTasks(EclipsePlugin.ECLIPSE_TASK_NAME);
             task.dependsOn("extractCauldronSources", "generateProjects");
-        }
+        });
 
-        makeTask(EclipsePlugin.ECLIPSE_TASK_NAME).dependsOn("eclipseClean", "eclipseCauldron");
+        makeTask(EclipsePlugin.ECLIPSE_TASK_NAME, task -> task.dependsOn("eclipseClean", "eclipseCauldron"));
     }
 
     private void createMiscTasks() {
         DelayedFile rangeMapClean = delayedFile("{BUILD_DIR}/tmp/rangemapCLEAN.txt");
         DelayedFile rangeMapDirty = delayedFile("{BUILD_DIR}/tmp/rangemapDIRTY.txt");
 
-        ExtractS2SRangeTask extractRange = makeTask("extractRangeCauldron", ExtractS2SRangeTask.class);
-        {
-            extractRange.setLibsFromProject(delayedFile(ECLIPSE_CDN + "/build.gradle"), CONFIG_COMPILE, true);
-            extractRange.addIn(delayedFile(ECLIPSE_CDN_SRC));
-            extractRange.setRangeMap(rangeMapDirty);
-        }
+        makeTask("extractRangeCauldron", ExtractS2SRangeTask.class, task -> {
+            task.setLibsFromProject(delayedFile(ECLIPSE_CDN + "/build.gradle"), CONFIG_COMPILE, true);
+            task.addIn(delayedFile(ECLIPSE_CDN_SRC));
+            task.setRangeMap(rangeMapDirty);
+        });
 
-        ApplyS2STask applyS2S = makeTask("retroMapCauldron", ApplyS2STask.class);
-        {
-            applyS2S.addIn(delayedFile(ECLIPSE_CDN_SRC));
-            applyS2S.setOut(delayedFile(PATCH_DIRTY));
-            applyS2S.addSrg(delayedFile(MCP_2_SRG_SRG));
-            applyS2S.addExc(delayedFile(MCP_EXC));
-            applyS2S.addExc(delayedFile(SRG_EXC)); // just in case
-            applyS2S.setRangeMap(rangeMapDirty);
-            applyS2S.dependsOn("genSrgs", extractRange);
+        makeTask("retroMapCauldron", ApplyS2STask.class, task -> {
+            task.addIn(delayedFile(ECLIPSE_CDN_SRC));
+            task.setOut(delayedFile(PATCH_DIRTY));
+            task.addSrg(delayedFile(MCP_2_SRG_SRG));
+            task.addExc(delayedFile(MCP_EXC));
+            task.addExc(delayedFile(SRG_EXC)); // just in case
+            task.setRangeMap(rangeMapDirty);
+            task.dependsOn("genSrgs", "extractRangeCauldron");
             String[] paths = {DevConstants.FML_RESOURCES, DevConstants.FORGE_RESOURCES, DevConstants.EXTRA_RESOURCES};
             for (String path : paths) {
                 for (File f : project.fileTree(delayedFile(path).call()).getFiles()) {
                     if (f.getPath().endsWith(".exc"))
-                        applyS2S.addExc(f);
+                        task.addExc(f);
                     else if (f.getPath().endsWith(".srg"))
-                        applyS2S.addSrg(f);
+                        task.addSrg(f);
                 }
             }
-        }
+        });
 
-        extractRange = makeTask("extractRangeClean", ExtractS2SRangeTask.class);
-        {
-            extractRange.setLibsFromProject(delayedFile(ECLIPSE_CLEAN + "/build.gradle"), CONFIG_COMPILE, true);
-            extractRange.addIn(delayedFile(REMAPPED_CLEAN));
-            extractRange.setRangeMap(rangeMapClean);
-        }
+        makeTask("extractRangeClean", ExtractS2SRangeTask.class, task -> {
+            task.setLibsFromProject(delayedFile(ECLIPSE_CLEAN + "/build.gradle"), CONFIG_COMPILE, true);
+            task.addIn(delayedFile(REMAPPED_CLEAN));
+            task.setRangeMap(rangeMapClean);
+        });
 
-        applyS2S = makeTask("retroMapClean", ApplyS2STask.class);
-        {
-            applyS2S.addIn(delayedFile(REMAPPED_CLEAN));
-            applyS2S.setOut(delayedFile(PATCH_CLEAN));
-            applyS2S.addSrg(delayedFile(MCP_2_SRG_SRG));
-            applyS2S.addExc(delayedFile(MCP_EXC));
-            applyS2S.addExc(delayedFile(SRG_EXC)); // just in case
-            applyS2S.setRangeMap(rangeMapClean);
-            applyS2S.dependsOn("genSrgs", extractRange);
-        }
+        makeTask("retroMapClean", ApplyS2STask.class, task -> {
+            task.addIn(delayedFile(REMAPPED_CLEAN));
+            task.setOut(delayedFile(PATCH_CLEAN));
+            task.addSrg(delayedFile(MCP_2_SRG_SRG));
+            task.addExc(delayedFile(MCP_EXC));
+            task.addExc(delayedFile(SRG_EXC)); // just in case
+            task.setRangeMap(rangeMapClean);
+            task.dependsOn("genSrgs", "extractRangeClean");
+        });
 
-        GeneratePatches task2 = makeTask("genPatches", GeneratePatches.class);
-        {
-            task2.setPatchDir(delayedFile(EXTRA_PATCH_DIR));
-            task2.setOriginal(delayedFile(ECLIPSE_CLEAN_SRC));
-            task2.setChanged(delayedFile(ECLIPSE_CDN_SRC));
-            task2.setOriginalPrefix("../src-base/minecraft");
-            task2.setChangedPrefix("../src-work/minecraft");
-            task2.getTaskDependencies().getDependencies(task2).clear(); // remove all the old dependants.
-            task2.setGroup("Cauldron");
-        }
+        makeTask("genPatches", GeneratePatches.class, task -> {
+            task.setPatchDir(delayedFile(EXTRA_PATCH_DIR));
+            task.setOriginal(delayedFile(ECLIPSE_CLEAN_SRC));
+            task.setChanged(delayedFile(ECLIPSE_CDN_SRC));
+            task.setOriginalPrefix("../src-base/minecraft");
+            task.setChangedPrefix("../src-work/minecraft");
+            task.getTaskDependencies().getDependencies(task).clear(); // remove all the old dependants.
+            task.setGroup("Cauldron");
 
-        if (false) // COMMENT OUT SRG PATCHES!
-        {
-            task2.setPatchDir(delayedFile(EXTRA_PATCH_DIR));
-            task2.setOriginal(delayedFile(PATCH_CLEAN)); // was ECLIPSE_CLEAN_SRC
-            task2.setChanged(delayedFile(PATCH_DIRTY)); // ECLIPSE_FORGE_SRC
-            task2.setOriginalPrefix("../src-base/minecraft");
-            task2.setChangedPrefix("../src-work/minecraft");
-            task2.dependsOn("retroMapCauldron", "retroMapClean");
-            task2.setGroup("Cauldron");
-        }
+            if (false) { // COMMENT OUT SRG PATCHES!
+                task.setPatchDir(delayedFile(EXTRA_PATCH_DIR));
+                task.setOriginal(delayedFile(PATCH_CLEAN)); // was ECLIPSE_CLEAN_SRC
+                task.setChanged(delayedFile(PATCH_DIRTY)); // ECLIPSE_FORGE_SRC
+                task.setOriginalPrefix("../src-base/minecraft");
+                task.setChangedPrefix("../src-work/minecraft");
+                task.dependsOn("retroMapCauldron", "retroMapClean");
+                task.setGroup("Cauldron");
+            }
+        });
 
-        Delete clean = makeTask("cleanCauldron", Delete.class);
-        {
-            clean.delete("eclipse");
-            clean.setGroup("Clean");
-        }
-        project.getTasks().getByName("clean").dependsOn("cleanCauldron");
+        makeTask("cleanCauldron", Delete.class, task -> {
+            task.delete("eclipse");
+            task.setGroup("Clean");
+        });
 
-        ObfuscateTask obf = makeTask("obfuscateJar", ObfuscateTask.class);
-        {
-            obf.setSrg(delayedFile(MCP_2_NOTCH_SRG));
-            obf.setExc(delayedFile(JOINED_EXC));
-            obf.setReverse(false);
-            obf.setPreFFJar(delayedFile(JAR_SRG_CDN));
-            obf.setOutJar(delayedFile(REOBF_TMP));
-            obf.setBuildFile(delayedFile(ECLIPSE_CDN + "/build.gradle"));
-            obf.setMethodsCsv(delayedFile(METHODS_CSV));
-            obf.setFieldsCsv(delayedFile(FIELDS_CSV));
-            obf.dependsOn("genSrgs");
-        }
+        configureTask(LifecycleBasePlugin.CLEAN_TASK_NAME, task -> task.dependsOn("cleanCauldron"));
 
-        GenBinaryPatches task3 = makeTask("genBinPatches", GenBinaryPatches.class);
-        {
-            task3.setCleanClient(delayedFile(Constants.JAR_CLIENT_FRESH));
-            task3.setCleanServer(delayedFile(Constants.JAR_SERVER_FRESH));
-            task3.setCleanMerged(delayedFile(Constants.JAR_MERGED));
-            task3.setDirtyJar(delayedFile(REOBF_TMP));
-            task3.setDeobfDataLzma(delayedFile(DEOBF_DATA));
-            task3.setOutJar(delayedFile(BINPATCH_TMP));
-            task3.setSrg(delayedFile(JOINED_SRG));
-            task3.addPatchList(delayedFileTree(EXTRA_PATCH_DIR));
-            task3.addPatchList(delayedFileTree(FORGE_PATCH_DIR));
-            task3.addPatchList(delayedFileTree(FML_PATCH_DIR));
-            task3.dependsOn("obfuscateJar", "compressDeobfData");
-        }
+        makeTask("obfuscateJar", ObfuscateTask.class, task -> {
+            task.setSrg(delayedFile(MCP_2_NOTCH_SRG));
+            task.setExc(delayedFile(JOINED_EXC));
+            task.setReverse(false);
+            task.setPreFFJar(delayedFile(JAR_SRG_CDN));
+            task.setOutJar(delayedFile(REOBF_TMP));
+            task.setBuildFile(delayedFile(ECLIPSE_CDN + "/build.gradle"));
+            task.setMethodsCsv(delayedFile(METHODS_CSV));
+            task.setFieldsCsv(delayedFile(FIELDS_CSV));
+            task.dependsOn("genSrgs");
+        });
+
+        makeTask("genBinPatches", GenBinaryPatches.class, task -> {
+            task.setCleanClient(delayedFile(Constants.JAR_CLIENT_FRESH));
+            task.setCleanServer(delayedFile(Constants.JAR_SERVER_FRESH));
+            task.setCleanMerged(delayedFile(Constants.JAR_MERGED));
+            task.setDirtyJar(delayedFile(REOBF_TMP));
+            task.setDeobfDataLzma(delayedFile(DEOBF_DATA));
+            task.setOutJar(delayedFile(BINPATCH_TMP));
+            task.setSrg(delayedFile(JOINED_SRG));
+            task.addPatchList(delayedFileTree(EXTRA_PATCH_DIR));
+            task.addPatchList(delayedFileTree(FORGE_PATCH_DIR));
+            task.addPatchList(delayedFileTree(FML_PATCH_DIR));
+            task.dependsOn("obfuscateJar", "compressDeobfData");
+        });
 
         /*
-        ForgeVersionReplaceTask task4 = makeTask("ciWriteBuildNumber", ForgeVersionReplaceTask.class);
-        {
-            task4.getOutputs().upToDateWhen(Constants.CALL_FALSE);
-            task4.setOutputFile(delayedFile(FORGE_VERSION_JAVA));
-            task4.setReplacement(delayedString("{BUILD_NUM}"));
-        }
+        makeTask("ciWriteBuildNumber", ForgeVersionReplaceTask.class, task -> {
+            task.getOutputs().upToDateWhen(Constants.CALL_FALSE);
+            task.setOutputFile(delayedFile(FORGE_VERSION_JAVA));
+            task.setReplacement(delayedString("{BUILD_NUM}"));
+        });
 
-        SubmoduleChangelogTask task5 = makeTask("fmlChangelog", SubmoduleChangelogTask.class);
-        {
-            task5.setSubmodule(delayedFile("fml"));
-            task5.setModuleName("FML");
-            task5.setPrefix("MinecraftForge/FML");
-        }
+        makeTask("fmlChangelog", SubmoduleChangelogTask.class, task -> {
+            task.setSubmodule(delayedFile("fml"));
+            task.setModuleName("FML");
+            task.setPrefix("MinecraftForge/FML");
+        });
         */
     }
 
     private void createPackageTasks() {
-        ChangelogTask log = makeTask("createChangelog", ChangelogTask.class);
-        {
-            log.getOutputs().upToDateWhen(Constants.SPEC_FALSE);
-            log.setServerRoot(delayedString("{JENKINS_SERVER}"));
-            log.setJobName(delayedString("{JENKINS_JOB}"));
-            log.setAuthName(delayedString("{JENKINS_AUTH_NAME}"));
-            log.setAuthPassword(delayedString("{JENKINS_AUTH_PASSWORD}"));
-            log.setTargetBuild(delayedString("{BUILD_NUM}"));
-            log.setOutput(delayedFile(CHANGELOG));
-        }
+        makeTask("createChangelog", ChangelogTask.class, task -> {
+            task.getOutputs().upToDateWhen(Constants.SPEC_FALSE);
+            task.setServerRoot(delayedString("{JENKINS_SERVER}"));
+            task.setJobName(delayedString("{JENKINS_JOB}"));
+            task.setAuthName(delayedString("{JENKINS_AUTH_NAME}"));
+            task.setAuthPassword(delayedString("{JENKINS_AUTH_PASSWORD}"));
+            task.setTargetBuild(delayedString("{BUILD_NUM}"));
+            task.setOutput(delayedFile(CHANGELOG));
+        });
 
         /*
-        VersionJsonTask vjson = makeTask("generateVersionJson", VersionJsonTask.class);
-        {
-            vjson.setInput(delayedFile(INSTALL_PROFILE));
-            vjson.setOutput(delayedFile(VERSION_JSON));
-            vjson.dependsOn("generateInstallJson");
-        }
+        makeTask("generateVersionJson", VersionJsonTask.class, task -> {
+            task.setInput(delayedFile(INSTALL_PROFILE));
+            task.setOutput(delayedFile(VERSION_JSON));
+            task.dependsOn("generateInstallJson");
+        });
         */
 
-        final DelayedJar uni = makeTask("packageUniversal", DelayedJar.class);
-        {
-            ArchiveTaskHelper.setClassifier(uni, delayedString("B{BUILD_NUM}").call());
-            uni.getInputs().file(delayedFile(EXTRA_JSON_REL));
-            uni.getOutputs().upToDateWhen(Constants.SPEC_FALSE);
-            uni.from(delayedZipTree(BINPATCH_TMP));
-            uni.from(delayedFileTree(EXTRA_RESOURCES));
-            uni.from(delayedFileTree(FORGE_RESOURCES));
-            uni.from(delayedFileTree(FML_RESOURCES));
-            uni.from(delayedFileTree(EXTRACTED_RES));
-            uni.from(delayedFile(FML_VERSION));
-            uni.from(delayedFile(FML_LICENSE));
-            uni.from(delayedFile(FML_CREDITS));
-            uni.from(delayedFile(FORGE_LICENSE));
-            uni.from(delayedFile(FORGE_CREDITS));
-            uni.from(delayedFile(PAULSCODE_LICENSE1));
-            uni.from(delayedFile(PAULSCODE_LICENSE2));
-            uni.from(delayedFile(DEOBF_DATA));
-            uni.from(delayedFile(CHANGELOG));
-            uni.from(delayedFile(VERSION_JSON));
-            uni.exclude("devbinpatches.pack.lzma");
-            uni.setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE);
-            uni.setIncludeEmptyDirs(false);
-            uni.setManifest(new Action<Manifest>() {
+        final DelayedJar uni = makeTask("packageUniversal", DelayedJar.class, task -> {
+            ArchiveTaskHelper.setClassifier(task, delayedString("B{BUILD_NUM}").call());
+            task.getInputs().file(delayedFile(EXTRA_JSON_REL));
+            task.getOutputs().upToDateWhen(Constants.SPEC_FALSE);
+            task.from(delayedZipTree(BINPATCH_TMP));
+            task.from(delayedFileTree(EXTRA_RESOURCES));
+            task.from(delayedFileTree(FORGE_RESOURCES));
+            task.from(delayedFileTree(FML_RESOURCES));
+            task.from(delayedFileTree(EXTRACTED_RES));
+            task.from(delayedFile(FML_VERSION));
+            task.from(delayedFile(FML_LICENSE));
+            task.from(delayedFile(FML_CREDITS));
+            task.from(delayedFile(FORGE_LICENSE));
+            task.from(delayedFile(FORGE_CREDITS));
+            task.from(delayedFile(PAULSCODE_LICENSE1));
+            task.from(delayedFile(PAULSCODE_LICENSE2));
+            task.from(delayedFile(DEOBF_DATA));
+            task.from(delayedFile(CHANGELOG));
+            task.from(delayedFile(VERSION_JSON));
+            task.exclude("devbinpatches.pack.lzma");
+            task.setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE);
+            task.setIncludeEmptyDirs(false);
+            task.setManifest(new Action<Manifest>() {
                 @Override
                 public void execute(Manifest manifest) {
                     manifest.getAttributes().put("Main-Class", delayedString("{MAIN_CLASS}").call());
@@ -466,7 +436,7 @@ public class CauldronDevPlugin extends DevBasePlugin {
                 }
             });
 
-//            uni.doLast(new Action<Task>() {
+//            task.doLast(new Action<Task>() {
 //                @Override
 //                public void execute(Task arg0) {
 //                    try {
@@ -477,42 +447,42 @@ public class CauldronDevPlugin extends DevBasePlugin {
 //                }
 //            });
 
-            ArchiveTaskHelper.setDestinationDir(uni, delayedFile("{BUILD_DIR}/distributions").call());
+            ArchiveTaskHelper.setDestinationDir(task, delayedFile("{BUILD_DIR}/distributions").call());
             //uni.dependsOn("genBinPatches", "createChangelog", "createVersionPropertiesFML", "generateVersionJson");
-            uni.dependsOn("genBinPatches", "createChangelog", "createVersionPropertiesFML");
-        }
+            task.dependsOn("genBinPatches", "createChangelog", "createVersionPropertiesFML");
+        }).get();
+
         project.getArtifacts().add("archives", uni);
 
-        FileFilterTask task = makeTask("generateInstallJson", FileFilterTask.class);
-        {
+        makeTask("generateInstallJson", FileFilterTask.class, task -> {
             task.setInputFile(delayedFile(EXTRA_JSON_REL));
             task.setOutputFile(delayedFile(INSTALL_PROFILE));
             task.addReplacement("@minecraft_version@", delayedString("{MC_VERSION}"));
             task.addReplacement("@version@", delayedString("{VERSION}"));
             task.addReplacement("@project@", delayedString("cauldron"));
             task.addReplacement("@artifact@", delayedString("net.minecraftforge:forge:{MC_VERSION}-{VERSION}"));
-            task.addReplacement("@universal_jar@", (Supplier<String>) () -> ArchiveTaskHelper.getArchiveName(uni));
+            task.addReplacement("@universal_jar@", (Supplier<String>) () -> ArchiveTaskHelper.getArchiveName((AbstractArchiveTask) task.dependsOn("packageUniversal")));
             task.addReplacement("@timestamp@", (Supplier<String>) () -> (new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ")).format(new Date()));
-        }
+        });
 
-        Zip inst = makeTask("packageInstaller", Zip.class);
-        {
-            ArchiveTaskHelper.setClassifier(inst, "installer");
-            inst.from((Callable<?>) () -> ArchiveTaskHelper.getArchivePath(uni));
-            inst.from(delayedFile(INSTALL_PROFILE));
-            inst.from(delayedFile(CHANGELOG));
-            inst.from(delayedFile(FML_LICENSE));
-            inst.from(delayedFile(FML_CREDITS));
-            inst.from(delayedFile(FORGE_LICENSE));
-            inst.from(delayedFile(FORGE_CREDITS));
-            inst.from(delayedFile(PAULSCODE_LICENSE1));
-            inst.from(delayedFile(PAULSCODE_LICENSE2));
-            inst.from(delayedFile(FORGE_LOGO));
-            inst.from(delayedZipTree(INSTALLER_BASE), new CopyInto("", "!*.json", "!*.png"));
-            inst.dependsOn("packageUniversal", "downloadBaseInstaller", "generateInstallJson");
-            inst.rename("forge_logo\\.png", "big_logo.png");
-            ArchiveTaskHelper.setExtension(inst, "jar");
-        }
+        Zip inst = makeTask("packageInstaller", Zip.class, task -> {
+            ArchiveTaskHelper.setClassifier(task, "installer");
+            task.from((Callable<?>) () -> ArchiveTaskHelper.getArchivePath((AbstractArchiveTask) task.dependsOn("packageUniversal")));
+            task.from(delayedFile(INSTALL_PROFILE));
+            task.from(delayedFile(CHANGELOG));
+            task.from(delayedFile(FML_LICENSE));
+            task.from(delayedFile(FML_CREDITS));
+            task.from(delayedFile(FORGE_LICENSE));
+            task.from(delayedFile(FORGE_CREDITS));
+            task.from(delayedFile(PAULSCODE_LICENSE1));
+            task.from(delayedFile(PAULSCODE_LICENSE2));
+            task.from(delayedFile(FORGE_LOGO));
+            task.from(delayedZipTree(INSTALLER_BASE), new CopyInto("", "!*.json", "!*.png"));
+            task.dependsOn("downloadBaseInstaller", "generateInstallJson");
+            task.rename("forge_logo\\.png", "big_logo.png");
+            ArchiveTaskHelper.setExtension(task, "jar");
+        }).get();
+
         project.getArtifacts().add("archives", inst);
     }
 
@@ -520,12 +490,14 @@ public class CauldronDevPlugin extends DevBasePlugin {
     public void afterEvaluate() {
         super.afterEvaluate();
 
-        SubprojectTask task = (SubprojectTask) project.getTasks().getByName("eclipseClean");
-        task.configureProject(getExtension().getSubprojects());
-        task.configureProject(getExtension().getCleanProject());
+        this.<SubprojectTask>configureTask("eclipseClean", task -> {
+            task.configureProject(getExtension().getSubprojects());
+            task.configureProject(getExtension().getCleanProject());
+        });
 
-        task = (SubprojectTask) project.getTasks().getByName("eclipseCauldron");
-        task.configureProject(getExtension().getSubprojects());
-        task.configureProject(getExtension().getCleanProject());
+        this.<SubprojectTask>configureTask("eclipseCauldron", task -> {
+            task.configureProject(getExtension().getSubprojects());
+            task.configureProject(getExtension().getCleanProject());
+        });
     }
 }

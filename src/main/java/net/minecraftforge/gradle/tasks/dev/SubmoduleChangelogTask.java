@@ -15,12 +15,13 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 
 public class SubmoduleChangelogTask extends DefaultTask {
+    @InputDirectory
     private DelayedFile submodule;
     @Input
     private String moduleName;
     @Input
     private String prefix;
-
+    @OutputFile
     private File outputFile;
 
     @TaskAction
@@ -54,17 +55,15 @@ public class SubmoduleChangelogTask extends DefaultTask {
         output = runGit(getSubmodule(), "--no-pager", "log", "--reverse", "--pretty=oneline", start + "..." + end);
         getLogger().lifecycle("Updated " + getModuleName() + ":");
 
-        BufferedWriter writer = Files.newBufferedWriter(outputFile.toPath(), Charset.defaultCharset());
-
-        for (String line : output) {
-            String out = getPrefix() + "@" + line;
-            getLogger().lifecycle(out);
-            writer.write(out);
-            writer.newLine();
+        try (BufferedWriter writer = Files.newBufferedWriter(outputFile.toPath(), Charset.defaultCharset())) {
+            for (String line : output) {
+                String out = getPrefix() + "@" + line;
+                getLogger().lifecycle(out);
+                writer.write(out);
+                writer.newLine();
+            }
         }
 
-        writer.flush();
-        writer.close();
         getLogger().lifecycle("");
     }
 
@@ -81,7 +80,6 @@ public class SubmoduleChangelogTask extends DefaultTask {
         return out.toString().trim().split("\n");
     }
 
-    @InputDirectory
     public File getSubmodule() {
         return submodule.call();
     }
@@ -106,7 +104,6 @@ public class SubmoduleChangelogTask extends DefaultTask {
         this.prefix = prefix;
     }
 
-    @OutputFile
     public File getOutputFile() {
         return outputFile;
     }

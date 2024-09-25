@@ -198,6 +198,17 @@ public class GenDevProjectsTask extends DefaultTask {
                 "       links.each { link -> node.appendNode('classpathentry', [kind:'src', path:link]) }",
                 "   }",
                 "   tasks.eclipseClasspath.dependsOn 'eclipseProject' //Make them run in correct order",
+                "}",
+                ""
+        );
+
+        a(o,
+                "tasks.withType(JavaCompile).configureEach {",
+                "    options.incremental = false",
+                "}",
+                "",
+                "processResources {",
+                "    duplicatesStrategy = DuplicatesStrategy.EXCLUDE",
                 "}"
         );
 

@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Locale;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Supplier;
@@ -171,7 +172,7 @@ public class DownloadAssetsTask extends DefaultTask {
         Asset(String name, String hash, long size) {
             this.name = name;
             this.path = hash.substring(0, 2) + "/" + hash;
-            this.hash = hash.toLowerCase();
+            this.hash = hash.toLowerCase(Locale.ROOT);
             this.size = size;
         }
     }

@@ -39,7 +39,6 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -472,20 +471,53 @@ public abstract class BasePlugin<K extends BaseExtension> implements Plugin<Proj
      */
     protected abstract K getOverlayExtension();
 
-    public DefaultTask makeTask(String name) {
-        return makeTask(name, DefaultTask.class);
+    public Task makeTask(String name) {
+        return makeTask(project, name).get();
+    }
+
+    public void makeTask(String name, Action<? super Task> action) {
+        makeTask(project, name, action);
+    }
+
+    public static Supplier<Task> makeTask(Project proj, String name, Action<? super Task> action) {
+        return GradleVersionUtils.choose("4.9", () -> () -> proj.getTasks().create(name, action), () -> proj.getTasks().register(name, action)::get);
+    }
+
+    public static Supplier<Task> makeTask(Project proj, String name) {
+        return GradleVersionUtils.choose("4.9", () -> () -> proj.getTasks().create(name), () -> proj.getTasks().register(name)::get);
     }
 
     public <T extends Task> T makeTask(String name, Class<T> type) {
         return makeTask(project, name, type);
     }
 
-    @SuppressWarnings("unchecked")
+    public <T extends Task> Supplier<T> makeTask(String name, Class<T> type, Action<? super T> args) {
+        return makeTask(project, name, type, args);
+    }
+
     public static <T extends Task> T makeTask(Project proj, String name, Class<T> type) {
-        HashMap<String, Object> map = new HashMap<>();
-        map.put("name", name);
-        map.put("type", type);
-        return (T) proj.task(map, name);
+        return proj.getTasks().create(name, type);
+    }
+
+    public static <T extends Task> Supplier<T> makeTask(Project proj, String name, Class<T> type, Action<? super T> action) {
+        return GradleVersionUtils.choose("4.9", () -> () -> proj.getTasks().create(name, type, action), () -> proj.getTasks().register(name, type, action)::get);
+    }
+
+    public <T extends Task> void configureTask(String name, Action<T> action) {
+        configureTask(project, name, action);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <T extends Task> void configureTask(Project proj, String name, Action<T> action) {
+        GradleVersionUtils.choose("5.0", () -> proj.getTasks().getByName(name, task -> action.execute((T) task)), () -> proj.getTasks().named(name, task -> action.execute((T) task)));
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <T extends Task> void configureTaskIfPresent(Project proj, String name, Action<T> action) {
+        try {
+            GradleVersionUtils.choose("5.0", () -> proj.getTasks().getByName(name, task -> action.execute((T) task)), () -> proj.getTasks().named(name, task -> action.execute((T) task)));
+        } catch (UnknownDomainObjectException ignored) {
+        }
     }
 
     public static Project getProject(File buildFile, Project parent) {
@@ -504,19 +536,14 @@ public abstract class BasePlugin<K extends BaseExtension> implements Plugin<Proj
         Project project = builder.build();
 
         if (buildFile != null) {
-            HashMap<String, String> map = new HashMap<>();
-            map.put("from", buildFile.getAbsolutePath());
-
-            project.apply(map);
+            project.apply(action -> action.from(buildFile));
         }
 
         return project;
     }
 
     public void applyExternalPlugin(String plugin) {
-        Map<String, Object> map = new HashMap<>();
-        map.put("plugin", plugin);
-        project.apply(map);
+        project.apply(action -> action.plugin(plugin));
     }
 
     public MavenArtifactRepository addMavenRepo(Project proj, final String name, final String url) {

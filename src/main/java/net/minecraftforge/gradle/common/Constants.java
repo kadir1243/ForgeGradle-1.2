@@ -12,14 +12,12 @@ import org.gradle.api.file.FileCollection;
 import org.gradle.api.logging.Logger;
 import org.gradle.api.specs.Spec;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.InputStream;
-import java.io.PrintStream;
+import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -247,14 +245,15 @@ public class Constants {
     }
 
     public static PrintStream getTaskLogStream(File buildDir, String name) {
-        final File taskLogs = new File(buildDir, "taskLogs");
-        taskLogs.mkdirs();
-        final File logFile = new File(taskLogs, name);
-        logFile.delete(); //Delete the old log
         try {
-            return new PrintStream(logFile);
-        } catch (FileNotFoundException ignored) {}
-        return null; // Should never get to here
+            Path taskLogs = buildDir.toPath().resolve("taskLogs");
+            Files.createDirectories(taskLogs);
+            Path logFile = taskLogs.resolve(name);
+            Files.deleteIfExists(logFile); // Delete the old log
+            return new PrintStream(Files.newOutputStream(logFile));
+        } catch (IOException e) {
+            throw new UncheckedIOException("Can not get task log-stream", e);
+        }
     }
 
 
@@ -294,6 +293,7 @@ public class Constants {
 
         if (!task.getState().getExecuted()) {
             logger.lifecycle(task.getPath());
+            task.getOutputs().upToDateWhen(SPEC_FALSE);
             for (Action<? super Task> t : task.getActions()) {
                 if (t == null) continue;
                 try {

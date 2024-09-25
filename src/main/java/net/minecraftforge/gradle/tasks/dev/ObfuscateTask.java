@@ -52,24 +52,18 @@ public class ObfuscateTask extends DefaultTask {
     private String subTask = JavaPlugin.JAR_TASK_NAME;
     @Input
     private LinkedList<String> extraSrg = new LinkedList<>();
+    private Project childProj;
+    private AbstractArchiveTask subTaskInstance;
+    private AbstractCompile compileTask;
 
     @TaskAction
     public void doTask() throws IOException {
-        getLogger().debug("Building child project model...");
-        Project childProj = FmlDevPlugin.getProject(getBuildFile(), getProject());
         for (Action<Project> act : configureProject) {
             if (act != null)
                 act.execute(childProj);
         }
 
-        AbstractCompile compileTask = (AbstractCompile) childProj.getTasks().getByName(JavaPlugin.COMPILE_JAVA_TASK_NAME);
-        AbstractArchiveTask jarTask = (AbstractArchiveTask) childProj.getTasks().getByName(subTask);
-
-        // executing jar task
-        getLogger().debug("Executing child {} task...", subTask);
-        Constants.executeTask(jarTask, getLogger());
-
-        File inJar = ArchiveTaskHelper.getArchivePath(jarTask);
+        File inJar = ArchiveTaskHelper.getArchivePath(subTaskInstance);
 
         File srg = getSrg();
 
@@ -171,8 +165,11 @@ public class ObfuscateTask extends DefaultTask {
 
     public void setBuildFile(DelayedFile buildFile) {
         this.buildFile = buildFile;
-    }
+        this.childProj = FmlDevPlugin.getProject(getBuildFile(), getProject());
 
+        this.dependsOn(compileTask = (AbstractCompile) childProj.getTasks().getByName(JavaPlugin.COMPILE_JAVA_TASK_NAME));
+        this.dependsOn(subTaskInstance = (AbstractArchiveTask) childProj.getTasks().getByName(subTask));
+    }
 
     public File getMethodsCsv() {
         return methodsCsv.call();

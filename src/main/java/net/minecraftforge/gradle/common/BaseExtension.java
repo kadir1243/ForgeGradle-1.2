@@ -6,6 +6,7 @@ import org.gradle.api.Project;
 
 import java.util.Arrays;
 import java.util.LinkedList;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -108,7 +109,7 @@ public class BaseExtension {
             return;
         }
 
-        mappings = mappings.toLowerCase();
+        mappings = mappings.toLowerCase(Locale.ROOT);
 
         if (!mappings.contains("_")) {
             throw new IllegalArgumentException("Mappings must be in format 'channel_version'. eg: snapshot_20140910");

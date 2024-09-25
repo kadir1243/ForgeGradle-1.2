@@ -26,8 +26,6 @@ import org.gradle.api.Action;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.api.file.FileTree;
-import org.gradle.api.file.FileVisitDetails;
-import org.gradle.api.file.FileVisitor;
 import org.gradle.api.tasks.Copy;
 import org.gradle.api.tasks.bundling.Zip;
 import org.gradle.process.ExecResult;
@@ -36,62 +34,56 @@ import javax.annotation.Nullable;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
 public abstract class DevBasePlugin extends BasePlugin<DevExtension> {
-    private AntPathMatcher antMatcher = new AntPathMatcher();
+    private final AntPathMatcher antMatcher = new AntPathMatcher();
     protected static final String[] JAVA_FILES = new String[]{"**.java", "*.java", "**/*.java"};
 
     @Override
     public void applyPlugin() {
-        ExtractTask task = makeTask("extractWorkspace", ExtractTask.class);
-        {
+        makeTask("extractWorkspace", ExtractTask.class, task -> {
             task.getOutputs().upToDateWhen(task1 -> {
                 File file = new File(project.getProjectDir(), "eclipse");
                 return (file.exists() && file.isDirectory());
             });
             task.from(delayedFile(DevConstants.WORKSPACE_ZIP));
             task.into(delayedFile(DevConstants.WORKSPACE));
-        }
+        });
 
-        DownloadTask task1;
         if (hasInstaller()) {
             // apply L4J
             this.applyExternalPlugin("launch4j");
 
-            if (project.getTasks().findByName("uploadArchives") != null) {
-                project.getTasks().getByName("uploadArchives").dependsOn("launch4j");
-            }
+            configureTaskIfPresent(project, "uploadArchives", task -> task.dependsOn("launch4j"));
 
-            task1 = makeTask("downloadBaseInstaller", DownloadTask.class);
-            {
-                task1.setOutput(delayedFile(DevConstants.INSTALLER_BASE));
-                task1.setUrl(delayedString(DevConstants.INSTALLER_URL));
-            }
+            makeTask("downloadBaseInstaller", DownloadTask.class, task -> {
+                task.setOutput(delayedFile(DevConstants.INSTALLER_BASE));
+                task.setUrl(delayedString(DevConstants.INSTALLER_URL));
+            });
 
-            task1 = makeTask("downloadL4J", DownloadTask.class);
-            {
-                task1.setOutput(delayedFile(DevConstants.LAUNCH4J));
-                task1.setUrl(delayedString(DevConstants.LAUNCH4J_URL));
-            }
+            makeTask("downloadL4J", DownloadTask.class, task -> {
+                task.getLogger().warn("url not available, downloadL4J task shouldn't called");
+                task.setOutput(delayedFile(DevConstants.LAUNCH4J));
+                task.setUrl(delayedString(DevConstants.LAUNCH4J_URL));
+            });
 
-            task = makeTask("extractL4J", ExtractTask.class);
-            {
+            makeTask("extractL4J", ExtractTask.class, task -> {
                 task.dependsOn("downloadL4J");
                 task.from(delayedFile(DevConstants.LAUNCH4J));
                 task.into(delayedFile(DevConstants.LAUNCH4J_DIR));
-            }
+            });
         }
 
-        task1 = makeTask("updateJson", DownloadTask.class); // TODO: url not available, this task shouldn't called
-        {
-            task1.getOutputs().upToDateWhen(Constants.SPEC_FALSE);
-            task1.setUrl(delayedString(Constants.MC_JSON_URL));
-            task1.setOutput(delayedFile(DevConstants.JSON_BASE));
-            task1.doLast(new Action<Task>() {
+        makeTask("updateJson", DownloadTask.class, task -> { // TODO: url not available, this task shouldn't called
+            task.getOutputs().upToDateWhen(Constants.SPEC_FALSE);
+            task.setUrl(delayedString(Constants.MC_JSON_URL));
+            task.setOutput(delayedFile(DevConstants.JSON_BASE));
+            task.doLast(new Action<Task>() {
                 @Override
                 public void execute(Task task) {
                     task.getLogger().warn("url not available, this task shouldn't called");
@@ -110,49 +102,45 @@ public abstract class DevBasePlugin extends BasePlugin<DevExtension> {
                     }
                 }
             });
-        }
+        });
 
-        CompressLZMA task3 = makeTask("compressDeobfData", CompressLZMA.class);
-        {
-            task3.setInputFile(delayedFile(DevConstants.NOTCH_2_SRG_SRG));
-            task3.setOutputFile(delayedFile(DevConstants.DEOBF_DATA));
-            task3.dependsOn("genSrgs");
-        }
+        makeTask("compressDeobfData", CompressLZMA.class, task -> {
+            task.setInputFile(delayedFile(DevConstants.NOTCH_2_SRG_SRG));
+            task.setOutputFile(delayedFile(DevConstants.DEOBF_DATA));
+            task.dependsOn("genSrgs");
+        });
 
-        MergeJarsTask task4 = makeTask("mergeJars", MergeJarsTask.class);
-        {
-            task4.setClient(delayedFile(Constants.JAR_CLIENT_FRESH));
-            task4.setServer(delayedFile(Constants.JAR_SERVER_FRESH));
-            task4.setOutJar(delayedFile(Constants.JAR_MERGED));
-            task4.setMergeCfg(delayedFile(DevConstants.MERGE_CFG));
-            task4.setMcVersion(delayedString("{MC_VERSION}"));
-            task4.dependsOn("downloadClient", "downloadServer"/*, "updateJson"*/); // TODO: Add back updateJson task
-        }
+        makeTask("mergeJars", MergeJarsTask.class, task -> {
+            task.setClient(delayedFile(Constants.JAR_CLIENT_FRESH));
+            task.setServer(delayedFile(Constants.JAR_SERVER_FRESH));
+            task.setOutJar(delayedFile(Constants.JAR_MERGED));
+            task.setMergeCfg(delayedFile(DevConstants.MERGE_CFG));
+            task.setMcVersion(delayedString("{MC_VERSION}"));
+            task.dependsOn("downloadClient", "downloadServer"/*, "updateJson"*/); // TODO: Add back updateJson task
+        });
 
-        CopyAssetsTask task5 = makeTask("copyAssets", CopyAssetsTask.class);
-        {
-            task5.setAssetsDir(delayedFile(Constants.ASSETS));
-            task5.setOutputDir(delayedFile(DevConstants.ECLIPSE_ASSETS));
-            task5.setAssetIndex(getAssetIndexSupplier());
-            task5.dependsOn("getAssets", "extractWorkspace");
-        }
+        makeTask("copyAssets", CopyAssetsTask.class, task -> {
+            task.setAssetsDir(delayedFile(Constants.ASSETS));
+            task.setOutputDir(delayedFile(DevConstants.ECLIPSE_ASSETS));
+            task.setAssetIndex(getAssetIndexSupplier());
+            task.dependsOn("getAssets", "extractWorkspace");
+        });
 
-        GenSrgTask task6 = makeTask("genSrgs", GenSrgTask.class);
-        {
-            task6.setInSrg(delayedFile(DevConstants.JOINED_SRG));
-            task6.setInExc(delayedFile(DevConstants.JOINED_EXC));
-            task6.setMethodsCsv(delayedFile(DevConstants.METHODS_CSV));
-            task6.setFieldsCsv(delayedFile(DevConstants.FIELDS_CSV));
-            task6.setNotchToSrg(delayedFile(DevConstants.NOTCH_2_SRG_SRG));
-            task6.setNotchToMcp(delayedFile(DevConstants.NOTCH_2_MCP_SRG));
-            task6.setSrgToMcp(delayedFile(DevConstants.SRG_2_MCP_SRG));
-            task6.setMcpToSrg(delayedFile(DevConstants.MCP_2_SRG_SRG));
-            task6.setMcpToNotch(delayedFile(DevConstants.MCP_2_NOTCH_SRG));
-            task6.setSrgExc(delayedFile(DevConstants.SRG_EXC));
-            task6.setMcpExc(delayedFile(DevConstants.MCP_EXC));
+        makeTask("genSrgs", GenSrgTask.class, task -> {
+            task.setInSrg(delayedFile(DevConstants.JOINED_SRG));
+            task.setInExc(delayedFile(DevConstants.JOINED_EXC));
+            task.setMethodsCsv(delayedFile(DevConstants.METHODS_CSV));
+            task.setFieldsCsv(delayedFile(DevConstants.FIELDS_CSV));
+            task.setNotchToSrg(delayedFile(DevConstants.NOTCH_2_SRG_SRG));
+            task.setNotchToMcp(delayedFile(DevConstants.NOTCH_2_MCP_SRG));
+            task.setSrgToMcp(delayedFile(DevConstants.SRG_2_MCP_SRG));
+            task.setMcpToSrg(delayedFile(DevConstants.MCP_2_SRG_SRG));
+            task.setMcpToNotch(delayedFile(DevConstants.MCP_2_NOTCH_SRG));
+            task.setSrgExc(delayedFile(DevConstants.SRG_EXC));
+            task.setMcpExc(delayedFile(DevConstants.MCP_EXC));
 
-            task6.dependsOn("extractMcpData");
-        }
+            task.dependsOn("extractMcpData");
+        });
     }
 
     @Override
@@ -186,39 +174,34 @@ public abstract class DevBasePlugin extends BasePlugin<DevExtension> {
         else {
             final String extraCommand = command;
 
-            Task task = project.getTasks().getByName("extractL4J");
-            task.doLast(new Action<Task>() {
-
+            configureTask("extractL4J", task -> task.doLast(new Action<Task>() {
                 @Override
                 public void execute(Task task) {
                     File f = new File(extraCommand);
                     if (!f.canExecute()) {
                         boolean worked = f.setExecutable(true);
-                        project.getLogger().debug("Setting file +X " + worked + " : " + f.getPath());
+                        task.getLogger().debug("Setting file +X {} : {}", worked, f.getPath());
                     }
                     FileTree tree = delayedFileTree(DevConstants.LAUNCH4J_DIR + "/bin").call();
-                    tree.visit(new FileVisitor() {
-                        @Override
-                        public void visitDir(FileVisitDetails dirDetails) {
-                        }
-
-                        @Override
-                        public void visitFile(FileVisitDetails fileDetails) {
-                            if (!fileDetails.getFile().canExecute()) {
-                                boolean worked = fileDetails.getFile().setExecutable(true);
-                                project.getLogger().debug("Setting file +X " + worked + " : " + fileDetails.getPath());
+                    tree.visit(visitDetails -> {
+                        if (!visitDetails.isDirectory()) {
+                            File file = visitDetails.getFile();
+                            if (!file.canExecute()) {
+                                boolean worked = file.setExecutable(true);
+                                task.getLogger().debug("Setting file +X {} : {}", worked, visitDetails.getPath());
                             }
                         }
                     });
                 }
-            });
+            }));
         }
 
         ext.setLaunch4jCmd(command);
 
-        Task task = project.getTasks().getByName("generateXmlConfig");
-        task.dependsOn("packageInstaller", "extractL4J");
-        task.getInputs().file(installer);
+        configureTask("generateXmlConfig", task -> {
+            task.dependsOn("packageInstaller", "extractL4J");
+            task.getInputs().file(installer);
+        });
 
         String icon = ext.getIcon();
         if (icon == null || icon.isEmpty()) {
@@ -241,26 +224,23 @@ public abstract class DevBasePlugin extends BasePlugin<DevExtension> {
         configureLaunch4J();
 
         // set obfuscate extras
-        project.getTasks().getByName("obfuscateJar", task -> {
-            ObfuscateTask obf = ((ObfuscateTask) task);
-            obf.setExtraSrg(getExtension().getSrgExtra());
-            obf.configureProject(getExtension().getSubprojects());
-            obf.configureProject(getExtension().getDirtyProject());
+        this.<ObfuscateTask>configureTask("obfuscateJar", task -> {
+            task.setExtraSrg(getExtension().getSrgExtra());
+            task.configureProject(getExtension().getSubprojects());
+            task.configureProject(getExtension().getDirtyProject());
         });
 
-        ExtractTask extractNatives = makeTask("extractNativesNew", ExtractTask.class);
-        {
-            extractNatives.exclude("META-INF", "META-INF/**", "META-INF/*");
-            extractNatives.into(delayedFile(Constants.NATIVES_DIR));
-        }
+        makeTask("extractNativesNew", ExtractTask.class, task -> {
+            task.exclude("META-INF", "META-INF/**", "META-INF/*");
+            task.into(delayedFile(Constants.NATIVES_DIR));
+        });
 
-        Copy copyNatives = makeTask("extractNatives", Copy.class);
-        {
-            copyNatives.from(delayedFile(Constants.NATIVES_DIR));
-            copyNatives.exclude("META-INF", "META-INF/**", "META-INF/*");
-            copyNatives.into(delayedFile(DevConstants.ECLIPSE_NATIVES));
-            copyNatives.dependsOn("extractWorkspace", extractNatives);
-        }
+        makeTask("extractNatives", Copy.class, task -> {
+            task.from(delayedFile(Constants.NATIVES_DIR));
+            task.exclude("META-INF", "META-INF/**", "META-INF/*");
+            task.into(delayedFile(DevConstants.ECLIPSE_NATIVES));
+            task.dependsOn("extractWorkspace", "extractNativesNew");
+        });
 
         DelayedFile devJson = getDevJson();
         if (devJson == null) {
@@ -283,14 +263,15 @@ public abstract class DevBasePlugin extends BasePlugin<DevExtension> {
                 String path = lib.getPathNatives();
                 String taskName = "downloadNatives-" + lib.getArtifactName().split(":")[1];
 
-                DownloadTask task = makeTask(taskName, DownloadTask.class);
-                {
+                makeTask(taskName, DownloadTask.class, task -> {
                     task.setOutput(delayedFile("{CACHE_DIR}/minecraft/" + path));
                     task.setUrl(delayedString(lib.getUrl() + path));
-                }
+                });
 
-                extractNatives.from(delayedFile("{CACHE_DIR}/minecraft/" + path));
-                extractNatives.dependsOn(taskName);
+                this.<ExtractTask>configureTask("extractNativesNew", task -> {
+                    task.from(delayedFile("{CACHE_DIR}/minecraft/" + path));
+                    task.dependsOn(taskName);
+                });
             }
         }
     }
@@ -396,27 +377,26 @@ public abstract class DevBasePlugin extends BasePlugin<DevExtension> {
         }
 
         Map<String, Map.Entry<byte[], Long>> unsigned = new HashMap<>();
-        File temp = new File(archive.getAbsoluteFile() + ".tmp");
-        File signed = new File(archive.getAbsoluteFile() + ".signed");
+        Path temp = new File(archive.getAbsoluteFile() + ".tmp").toPath();
+        Path signed = new File(archive.getAbsoluteFile() + ".signed").toPath();
 
-        if (temp.exists()) temp.delete();
-        if (signed.exists()) signed.delete();
+        Files.deleteIfExists(temp);
+        Files.deleteIfExists(signed);
 
         // Create a temporary jar with only the things we want to sign
-        ZipOutputStream out = new ZipOutputStream(new BufferedOutputStream(Files.newOutputStream(temp.toPath())));
-        ZipFile base = new ZipFile(archive);
-        for (ZipEntry e : Collections.list(base.entries())) {
-            if (shouldSign(e.getName(), includes, excludes)) {
-                ZipEntry n = new ZipEntry(e.getName());
-                n.setTime(e.getTime());
-                out.putNextEntry(n);
-                ByteStreams.copy(base.getInputStream(e), out);
-            } else {
-                unsigned.put(e.getName(), new MapEntry(ByteStreams.toByteArray(base.getInputStream(e)), e.getTime()));
+        try (ZipOutputStream out = new ZipOutputStream(new BufferedOutputStream(Files.newOutputStream(temp)));
+             ZipFile base = new ZipFile(archive)) {
+            for (ZipEntry e : Collections.list(base.entries())) {
+                if (shouldSign(e.getName(), includes, excludes)) {
+                    ZipEntry n = new ZipEntry(e.getName());
+                    n.setTime(e.getTime());
+                    out.putNextEntry(n);
+                    ByteStreams.copy(base.getInputStream(e), out);
+                } else {
+                    unsigned.put(e.getName(), new MapEntry(ByteStreams.toByteArray(base.getInputStream(e)), e.getTime()));
+                }
             }
         }
-        base.close();
-        out.close();
 
         // Sign the temporary jar
         Map<String, String> jarsigner = (Map<String, String>) project.property("jarsigner");
@@ -426,37 +406,37 @@ public abstract class DevBasePlugin extends BasePlugin<DevExtension> {
         args.put("storepass", jarsigner.get("storepass"));
         args.put("keypass", jarsigner.get("keypass"));
         args.put("keystore", new File(jarsigner.get("keystore")).getAbsolutePath());
-        args.put("jar", temp.getAbsolutePath());
-        args.put("signedjar", signed.getAbsolutePath());
+        args.put("jar", temp.toAbsolutePath().toString());
+        args.put("signedjar", signed.toAbsolutePath().toString());
         project.getAnt().invokeMethod("signjar", args);
 
         //Kill temp files to make room
-        archive.delete();
-        temp.delete();
+        Files.delete(archive.toPath());
+        Files.delete(temp);
 
         //Join the signed jar and our unsigned content
-        out = new ZipOutputStream(new BufferedOutputStream(Files.newOutputStream(archive.toPath())));
-        base = new ZipFile(signed);
-        for (ZipEntry e : Collections.list(base.entries())) {
-            if (e.isDirectory()) {
-                out.putNextEntry(e);
-            } else {
-                ZipEntry n = new ZipEntry(e.getName());
-                n.setTime(e.getTime());
-                out.putNextEntry(n);
-                ByteStreams.copy(base.getInputStream(e), out);
+        try (ZipOutputStream zipOutputStream = new ZipOutputStream(new BufferedOutputStream(Files.newOutputStream(archive.toPath())))) {
+            try (ZipFile zipFile = new ZipFile(signed.toFile())) {
+                for (ZipEntry e : Collections.list(zipFile.entries())) {
+                    if (e.isDirectory()) {
+                        zipOutputStream.putNextEntry(e);
+                    } else {
+                        ZipEntry n = new ZipEntry(e.getName());
+                        n.setTime(e.getTime());
+                        zipOutputStream.putNextEntry(n);
+                        ByteStreams.copy(zipFile.getInputStream(e), zipOutputStream);
+                    }
+                }
+            }
+
+            for (Map.Entry<String, Map.Entry<byte[], Long>> e : unsigned.entrySet()) {
+                ZipEntry n = new ZipEntry(e.getKey());
+                n.setTime(e.getValue().getValue());
+                zipOutputStream.putNextEntry(n);
+                zipOutputStream.write(e.getValue().getKey());
             }
         }
-        base.close();
-
-        for (Map.Entry<String, Map.Entry<byte[], Long>> e : unsigned.entrySet()) {
-            ZipEntry n = new ZipEntry(e.getKey());
-            n.setTime(e.getValue().getValue());
-            out.putNextEntry(n);
-            out.write(e.getValue().getKey());
-        }
-        out.close();
-        signed.delete();
+        Files.delete(signed);
     }
 
     protected boolean hasInstaller() {

@@ -26,7 +26,6 @@ import org.objectweb.asm.Opcodes;
 
 import javax.inject.Inject;
 import java.io.*;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -88,7 +87,7 @@ public class ExtractS2SRangeTask extends DefaultTask {
             List<String> files = inSup.gatherAll(".java");
 
             // read rangemap
-            List<String> lines = Files.readAllLines(rangemap.toPath(), StandardCharsets.UTF_8);
+            List<String> lines = Files.readAllLines(rangemap.toPath());
             {
                 Iterator<String> it = lines.iterator();
                 while (it.hasNext()) {
@@ -197,12 +196,12 @@ public class ExtractS2SRangeTask extends DefaultTask {
         RangeExtractor extractor = new RangeExtractor();
         extractor.addLibs(getLibs().getAsPath()).setSrc(inSup);
 
-        PrintStream stream = new PrintStream(Constants.getTaskLogStream(buildDir, this.getName() + ".log"));
-        extractor.setOutLogger(stream);
+        boolean worked;
+        try (PrintStream stream = new PrintStream(Constants.getTaskLogStream(buildDir, this.getName() + ".log"))) {
+            extractor.setOutLogger(stream);
 
-        boolean worked = extractor.generateRangeMap(rangeMap);
-
-        stream.close();
+            worked = extractor.generateRangeMap(rangeMap);
+        }
 
         if (!worked)
             throw new RuntimeException("RangeMap generation Failed!!!");
@@ -261,8 +260,7 @@ public class ExtractS2SRangeTask extends DefaultTask {
     }
 
     public FileCollection getLibs() {
-        if (projectFile != null && libs == null) // libs == null to avoid doing this any more than necessary..
-        {
+        if (projectFile != null && libs == null) { // libs == null to avoid doing this any more than necessary..
             File buildscript = projectFile.call();
             if (!buildscript.exists())
                 return null;

@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 
 import static net.minecraftforge.gradle.common.Constants.JAR_MERGED;
 import static net.minecraftforge.gradle.user.UserConstants.CLASSIFIER_DECOMPILED;
@@ -140,7 +141,7 @@ public abstract class UserPatchBasePlugin extends UserBasePlugin<UserPatchExtens
             SourceSet api = javaConv.getByName("api");
 
             for (File at : main.getResources().getFiles()) {
-                if (at.getName().toLowerCase().endsWith("_at.cfg")) {
+                if (at.getName().toLowerCase(Locale.ROOT).endsWith("_at.cfg")) {
                     project.getLogger().lifecycle("Found AccessTransformer in main resources: " + at.getName());
                     binDeobf.addTransformer(at);
                     decompDeobf.addTransformer(at);
@@ -148,7 +149,7 @@ public abstract class UserPatchBasePlugin extends UserBasePlugin<UserPatchExtens
             }
 
             for (File at : api.getResources().getFiles()) {
-                if (at.getName().toLowerCase().endsWith("_at.cfg")) {
+                if (at.getName().toLowerCase(Locale.ROOT).endsWith("_at.cfg")) {
                     project.getLogger().lifecycle("Found AccessTransformer in api resources: " + at.getName());
                     binDeobf.addTransformer(at);
                     decompDeobf.addTransformer(at);

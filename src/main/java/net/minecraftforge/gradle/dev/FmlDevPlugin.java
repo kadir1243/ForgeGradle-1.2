@@ -14,13 +14,12 @@ import net.minecraftforge.gradle.tasks.abstractutil.ExtractTask;
 import net.minecraftforge.gradle.tasks.abstractutil.FileFilterTask;
 import net.minecraftforge.gradle.tasks.dev.*;
 import org.gradle.api.Action;
-import org.gradle.api.DefaultTask;
 import org.gradle.api.Project;
-import org.gradle.api.Task;
 import org.gradle.api.file.DuplicatesStrategy;
 import org.gradle.api.java.archives.Manifest;
 import org.gradle.api.tasks.Copy;
 import org.gradle.api.tasks.Delete;
+import org.gradle.api.tasks.bundling.AbstractArchiveTask;
 import org.gradle.api.tasks.bundling.Zip;
 import org.gradle.plugins.ide.eclipse.EclipsePlugin;
 
@@ -64,142 +63,132 @@ public class FmlDevPlugin extends DevBasePlugin {
         createPackageTasks();
 
         // the master setup task.
-        Task task = makeTask("setupFML", DefaultTask.class);
-        task.dependsOn("extractFmlSources", "generateProjects", EclipsePlugin.ECLIPSE_TASK_NAME, "copyAssets");
-        task.setGroup("FML");
+        makeTask("setupFML", task -> {
+            task.dependsOn("extractFmlSources", "generateProjects", EclipsePlugin.ECLIPSE_TASK_NAME, "copyAssets");
+            task.setGroup("FML");
+        });
 
         // the master task.
-        task = makeTask("buildPackages");
-        task.dependsOn("launch4j", "createChangelog", "packageUniversal", "packageInstaller", "packageUserDev", "packageSrc");
-        task.setGroup("FML");
+        makeTask("buildPackages", task -> {
+            task.dependsOn("launch4j", "createChangelog", "packageUniversal", "packageInstaller", "packageUserDev", "packageSrc");
+            task.setGroup("FML");
+        });
 
         // clean decompile task
-        Delete delTask = makeTask("cleanDecompile", Delete.class);
-        delTask.delete(delayedFile(DevConstants.ECLIPSE_CLEAN_SRC));
-        delTask.delete(delayedFile(DevConstants.ECLIPSE_FML_SRC));
-        delTask.delete(delayedFile(DevConstants.ZIP_DECOMP_FML));
-        delTask.delete(delayedFile(DevConstants.ZIP_PATCHED_FML));
-        delTask.setGroup("Clean");
+        makeTask("cleanDecompile", Delete.class, task -> {
+            task.delete(delayedFile(DevConstants.ECLIPSE_CLEAN_SRC));
+            task.delete(delayedFile(DevConstants.ECLIPSE_FML_SRC));
+            task.delete(delayedFile(DevConstants.ZIP_DECOMP_FML));
+            task.delete(delayedFile(DevConstants.ZIP_PATCHED_FML));
+            task.setGroup("Clean");
+        });
     }
 
     protected void createJarProcessTasks() {
+        makeTask("deobfuscateJar", ProcessJarTask.class, task -> {
+            task.setInJar(delayedFile(Constants.JAR_MERGED));
+            task.setOutCleanJar(delayedFile(DevConstants.JAR_SRG_FML));
+            task.setSrg(delayedFile(DevConstants.NOTCH_2_SRG_SRG));
+            task.setExceptorCfg(delayedFile(DevConstants.JOINED_EXC));
+            task.setExceptorJson(delayedFile(DevConstants.EXC_JSON));
+            task.addTransformerClean(delayedFile(DevConstants.FML_RESOURCES + "/fml_at.cfg"));
+            task.setApplyMarkers(true);
+            task.dependsOn("downloadMcpTools", "mergeJars", "genSrgs");
+        });
 
-        ProcessJarTask task2 = makeTask("deobfuscateJar", ProcessJarTask.class);
-        {
-            task2.setInJar(delayedFile(Constants.JAR_MERGED));
-            task2.setOutCleanJar(delayedFile(DevConstants.JAR_SRG_FML));
-            task2.setSrg(delayedFile(DevConstants.NOTCH_2_SRG_SRG));
-            task2.setExceptorCfg(delayedFile(DevConstants.JOINED_EXC));
-            task2.setExceptorJson(delayedFile(DevConstants.EXC_JSON));
-            task2.addTransformerClean(delayedFile(DevConstants.FML_RESOURCES + "/fml_at.cfg"));
-            task2.setApplyMarkers(true);
-            task2.dependsOn("downloadMcpTools", "mergeJars", "genSrgs");
-        }
+        makeTask("decompile", DecompileTask.class, task -> {
+            task.setInJar(delayedFile(DevConstants.JAR_SRG_FML));
+            task.setOutJar(delayedFile(DevConstants.ZIP_DECOMP_FML));
+            task.setFernFlower(delayedFile(Constants.FERNFLOWER));
+            task.setPatch(delayedFile(DevConstants.MCP_PATCH_DIR));
+            task.setAstyleConfig(delayedFile(DevConstants.ASTYLE_CFG));
+            task.dependsOn("downloadMcpTools", "deobfuscateJar");
+        });
 
-        DecompileTask task3 = makeTask("decompile", DecompileTask.class);
-        {
-            task3.setInJar(delayedFile(DevConstants.JAR_SRG_FML));
-            task3.setOutJar(delayedFile(DevConstants.ZIP_DECOMP_FML));
-            task3.setFernFlower(delayedFile(Constants.FERNFLOWER));
-            task3.setPatch(delayedFile(DevConstants.MCP_PATCH_DIR));
-            task3.setAstyleConfig(delayedFile(DevConstants.ASTYLE_CFG));
-            task3.dependsOn("downloadMcpTools", "deobfuscateJar");
-        }
+        makeTask("remapCleanJar", RemapSourcesTask.class, task -> {
+            task.setInJar(delayedFile(DevConstants.ZIP_DECOMP_FML));
+            task.setOutJar(delayedFile(DevConstants.REMAPPED_CLEAN));
+            task.setMethodsCsv(delayedFile(DevConstants.METHODS_CSV));
+            task.setFieldsCsv(delayedFile(DevConstants.FIELDS_CSV));
+            task.setParamsCsv(delayedFile(DevConstants.PARAMS_CSV));
+            task.setDoesCache(false);
+            task.setNoJavadocs();
+            task.dependsOn("decompile");
+        });
 
-        RemapSourcesTask remapTask = makeTask("remapCleanJar", RemapSourcesTask.class);
-        {
-            remapTask.setInJar(delayedFile(DevConstants.ZIP_DECOMP_FML));
-            remapTask.setOutJar(delayedFile(DevConstants.REMAPPED_CLEAN));
-            remapTask.setMethodsCsv(delayedFile(DevConstants.METHODS_CSV));
-            remapTask.setFieldsCsv(delayedFile(DevConstants.FIELDS_CSV));
-            remapTask.setParamsCsv(delayedFile(DevConstants.PARAMS_CSV));
-            remapTask.setDoesCache(false);
-            remapTask.setNoJavadocs();
-            remapTask.dependsOn("decompile");
-        }
+        makeTask("fmlPatchJar", ProcessSrcJarTask.class, task -> {
+            task.setInJar(delayedFile(DevConstants.ZIP_DECOMP_FML));
+            task.setOutJar(delayedFile(DevConstants.ZIP_PATCHED_FML));
+            task.addStage("fml", delayedFile(DevConstants.FML_PATCH_DIR));
+            task.setDoesCache(false);
+            task.setMaxFuzz(2);
+            task.dependsOn("decompile");
+        });
 
-        ProcessSrcJarTask task5 = makeTask("fmlPatchJar", ProcessSrcJarTask.class);
-        {
-            task5.setInJar(delayedFile(DevConstants.ZIP_DECOMP_FML));
-            task5.setOutJar(delayedFile(DevConstants.ZIP_PATCHED_FML));
-            task5.addStage("fml", delayedFile(DevConstants.FML_PATCH_DIR));
-            task5.setDoesCache(false);
-            task5.setMaxFuzz(2);
-            task5.dependsOn("decompile");
-        }
-
-        remapTask = makeTask("remapDirtyJar", RemapSourcesTask.class);
-        {
-            remapTask.setInJar(delayedFile(DevConstants.ZIP_PATCHED_FML));
-            remapTask.setOutJar(delayedFile(DevConstants.REMAPPED_DIRTY));
-            remapTask.setMethodsCsv(delayedFile(DevConstants.METHODS_CSV));
-            remapTask.setFieldsCsv(delayedFile(DevConstants.FIELDS_CSV));
-            remapTask.setParamsCsv(delayedFile(DevConstants.PARAMS_CSV));
-            remapTask.setDoesCache(false);
-            remapTask.setNoJavadocs();
-            remapTask.dependsOn("fmlPatchJar");
-        }
+        makeTask("remapDirtyJar", RemapSourcesTask.class, task -> {
+            task.setInJar(delayedFile(DevConstants.ZIP_PATCHED_FML));
+            task.setOutJar(delayedFile(DevConstants.REMAPPED_DIRTY));
+            task.setMethodsCsv(delayedFile(DevConstants.METHODS_CSV));
+            task.setFieldsCsv(delayedFile(DevConstants.FIELDS_CSV));
+            task.setParamsCsv(delayedFile(DevConstants.PARAMS_CSV));
+            task.setDoesCache(false);
+            task.setNoJavadocs();
+            task.dependsOn("fmlPatchJar");
+        });
     }
 
     private void createSourceCopyTasks() {
         // COPY CLEAN STUFF
-        ExtractTask task = makeTask("extractMcResources", ExtractTask.class);
-        {
+        makeTask("extractMcResources", ExtractTask.class, task -> {
             task.exclude(JAVA_FILES);
             task.setIncludeEmptyDirs(false);
             task.from(delayedFile(DevConstants.REMAPPED_CLEAN));
             task.into(delayedFile(DevConstants.ECLIPSE_CLEAN_RES));
             task.dependsOn("extractWorkspace", "remapCleanJar");
-        }
+        });
 
-        Copy copy = makeTask("copyStart", Copy.class);
-        {
-            copy.from(delayedFile("{FML_CONF_DIR}/patches"));
-            copy.include("Start.java");
-            copy.into(delayedFile(DevConstants.ECLIPSE_CLEAN_SRC));
-            copy.dependsOn("extractMcResources");
-        }
+        makeTask("copyStart", Copy.class, task -> {
+            task.from(delayedFile("{FML_CONF_DIR}/patches"));
+            task.include("Start.java");
+            task.into(delayedFile(DevConstants.ECLIPSE_CLEAN_SRC));
+            task.dependsOn("extractMcResources");
+        });
 
-        task = makeTask("extractMcSource", ExtractTask.class);
-        {
+        makeTask("extractMcSource", ExtractTask.class, task -> {
             task.include(JAVA_FILES);
             task.setIncludeEmptyDirs(false);
             task.from(delayedFile(DevConstants.REMAPPED_CLEAN));
             task.into(delayedFile(DevConstants.ECLIPSE_CLEAN_SRC));
             task.dependsOn("copyStart");
-        }
+        });
 
         // COPY FML STUFF
-        task = makeTask("extractFmlResources", ExtractTask.class);
-        {
+        makeTask("extractFmlResources", ExtractTask.class, task -> {
             task.exclude(JAVA_FILES);
             task.from(delayedFile(DevConstants.REMAPPED_DIRTY));
             task.into(delayedFile(DevConstants.ECLIPSE_FML_RES));
             task.dependsOn("remapDirtyJar", "extractWorkspace");
-        }
+        });
 
-        copy = makeTask("copyDeobfData", Copy.class);
-        {
-            copy.from(delayedFile(DevConstants.DEOBF_DATA));
-            copy.from(delayedFile(DevConstants.FML_VERSION));
-            copy.into(delayedFile(DevConstants.ECLIPSE_FML_RES));
-            copy.dependsOn("extractFmlResources", "compressDeobfData");
-        }
+        makeTask("copyDeobfData", Copy.class, task -> {
+            task.from(delayedFile(DevConstants.DEOBF_DATA));
+            task.from(delayedFile(DevConstants.FML_VERSION));
+            task.into(delayedFile(DevConstants.ECLIPSE_FML_RES));
+            task.dependsOn("extractFmlResources", "compressDeobfData");
+        });
 
-        task = makeTask("extractFmlSources", ExtractTask.class);
-        {
+        makeTask("extractFmlSources", ExtractTask.class, task -> {
             task.include(JAVA_FILES);
             task.exclude("cpw/**");
             task.exclude("net/minecraftforge/fml/**");
             task.from(delayedFile(DevConstants.REMAPPED_DIRTY));
             task.into(delayedFile(DevConstants.ECLIPSE_FML_SRC));
             task.dependsOn("copyDeobfData");
-        }
+        });
     }
 
     private void createProjectTasks() {
-        GenDevProjectsTask task = makeTask("generateProjectClean", GenDevProjectsTask.class);
-        {
+        makeTask("generateProjectClean", GenDevProjectsTask.class, task -> {
             task.setTargetDir(delayedFile(DevConstants.ECLIPSE_CLEAN));
             task.setJson(delayedFile(DevConstants.JSON_DEV)); // Change to FmlConstants.JSON_BASE eventually, so that it's the base vanilla json
 
@@ -208,10 +197,9 @@ public class FmlDevPlugin extends DevBasePlugin {
             task.setMappingVersion(delayedString("{MAPPING_VERSION}"));
 
             task.dependsOn("extractNatives");
-        }
+        });
 
-        task = makeTask("generateProjectFML", GenDevProjectsTask.class);
-        {
+        makeTask("generateProjectFML", GenDevProjectsTask.class, task -> {
             task.setJson(delayedFile(DevConstants.JSON_DEV));
             task.setTargetDir(delayedFile(DevConstants.ECLIPSE_FML));
 
@@ -228,147 +216,135 @@ public class FmlDevPlugin extends DevBasePlugin {
             task.setMappingVersion(delayedString("{MAPPING_VERSION}"));
 
             task.dependsOn("extractNatives", "createVersionProperties");
-        }
+        });
 
-        makeTask("generateProjects").dependsOn("generateProjectClean", "generateProjectFML");
+        makeTask("generateProjects", task -> task.dependsOn("generateProjectClean", "generateProjectFML"));
     }
 
     private void createEclipseTasks() {
-        SubprojectTask task = makeTask("eclipseClean", SubprojectTask.class);
-        {
+        makeTask("eclipseClean", SubprojectTask.class, task -> {
             task.setBuildFile(delayedFile(DevConstants.ECLIPSE_CLEAN + "/build.gradle"));
             task.setTasks(EclipsePlugin.ECLIPSE_TASK_NAME);
             task.dependsOn("extractMcSource", "generateProjects");
-        }
+        });
 
-        task = makeTask("eclipseFML", SubprojectTask.class);
-        {
+        makeTask("eclipseFML", SubprojectTask.class, task -> {
             task.setBuildFile(delayedFile(DevConstants.ECLIPSE_FML + "/build.gradle"));
             task.setTasks(EclipsePlugin.ECLIPSE_TASK_NAME);
             task.dependsOn("extractFmlSources", "generateProjects");
-        }
+        });
 
-        makeTask(EclipsePlugin.ECLIPSE_TASK_NAME).dependsOn("eclipseClean", "eclipseFML");
+        makeTask(EclipsePlugin.ECLIPSE_TASK_NAME, task1 -> task1.dependsOn("eclipseClean", "eclipseFML"));
     }
 
     private void createMiscTasks() {
         DelayedFile rangeMap = delayedFile("{BUILD_DIR}/tmp/rangemap.txt");
 
-        ExtractS2SRangeTask task = makeTask("extractRange", ExtractS2SRangeTask.class);
-        {
+        makeTask("extractRange", ExtractS2SRangeTask.class, task -> {
             task.setLibsFromProject(delayedFile(DevConstants.ECLIPSE_FML + "/build.gradle"), CONFIG_COMPILE, true);
             task.addIn(delayedFile(DevConstants.ECLIPSE_FML_SRC));
             //task.addIn(delayedFile(DevConstants.FML_SOURCES));
             task.setExcOutput(delayedFile(DevConstants.EXC_MODIFIERS_DIRTY));
             task.setRangeMap(rangeMap);
-        }
+        });
 
-        ApplyS2STask task4 = makeTask("retroMapSources", ApplyS2STask.class);
-        {
-            task4.addIn(delayedFile(DevConstants.ECLIPSE_FML_SRC));
-            task4.setOut(delayedFile(DevConstants.PATCH_DIRTY));
-            task4.addSrg(delayedFile(DevConstants.MCP_2_SRG_SRG));
-            task4.addExc(delayedFile(DevConstants.MCP_EXC));
-            task4.addExc(delayedFile(DevConstants.SRG_EXC)); // both EXCs just in case.
-            task4.setExcModifiers(delayedFile(EXC_MODIFIERS_DIRTY));
-            task4.setRangeMap(rangeMap);
-            task4.dependsOn("genSrgs", task);
+        makeTask("retroMapSources", ApplyS2STask.class, task -> {
+            task.addIn(delayedFile(DevConstants.ECLIPSE_FML_SRC));
+            task.setOut(delayedFile(DevConstants.PATCH_DIRTY));
+            task.addSrg(delayedFile(DevConstants.MCP_2_SRG_SRG));
+            task.addExc(delayedFile(DevConstants.MCP_EXC));
+            task.addExc(delayedFile(DevConstants.SRG_EXC)); // both EXCs just in case.
+            task.setExcModifiers(delayedFile(EXC_MODIFIERS_DIRTY));
+            task.setRangeMap(rangeMap);
+            task.dependsOn("genSrgs", "extractRange");
 
             // find all the exc & srg files in the resources.
             for (File f : project.fileTree(delayedFile(DevConstants.FML_RESOURCES).call()).getFiles()) {
                 if (f.getPath().endsWith(".exc"))
-                    task4.addExc(f);
+                    task.addExc(f);
                 else if (f.getPath().endsWith(".srg"))
-                    task4.addSrg(f);
+                    task.addSrg(f);
             }
-        }
+        });
 
-        GeneratePatches task2 = makeTask("genPatches", GeneratePatches.class);
-        {
-            task2.setPatchDir(delayedFile(DevConstants.FML_PATCH_DIR));
-            task2.setOriginal(delayedFile(DevConstants.ZIP_DECOMP_FML));
-            task2.setChanged(delayedFile(DevConstants.PATCH_DIRTY));
-            task2.setOriginalPrefix("../src-base/minecraft");
-            task2.setChangedPrefix("../src-work/minecraft");
-            task2.setGroup("FML");
-            task2.dependsOn("retroMapSources");
-        }
+        makeTask("genPatches", GeneratePatches.class, task -> {
+            task.setPatchDir(delayedFile(DevConstants.FML_PATCH_DIR));
+            task.setOriginal(delayedFile(DevConstants.ZIP_DECOMP_FML));
+            task.setChanged(delayedFile(DevConstants.PATCH_DIRTY));
+            task.setOriginalPrefix("../src-base/minecraft");
+            task.setChangedPrefix("../src-work/minecraft");
+            task.setGroup("FML");
+            task.dependsOn("retroMapSources");
+        });
 
-        Delete clean = makeTask("cleanFml", Delete.class);
-        {
-            clean.delete("eclipse");
-            clean.setGroup("Clean");
-        }
+        makeTask("cleanFml", Delete.class, task -> {
+            task.delete("eclipse");
+            task.setGroup("Clean");
+        });
 
-        ObfuscateTask obf = makeTask("obfuscateJar", ObfuscateTask.class);
-        {
-            obf.setSrg(delayedFile(DevConstants.MCP_2_NOTCH_SRG));
-            obf.setExc(delayedFile(DevConstants.SRG_EXC));
-            obf.setReverse(false);
-            obf.setPreFFJar(delayedFile(DevConstants.JAR_SRG_FML));
-            obf.setOutJar(delayedFile(DevConstants.REOBF_TMP));
-            obf.setBuildFile(delayedFile(DevConstants.ECLIPSE_FML + "/build.gradle"));
-            obf.setMethodsCsv(delayedFile(DevConstants.METHODS_CSV));
-            obf.setFieldsCsv(delayedFile(DevConstants.FIELDS_CSV));
-            obf.dependsOn("generateProjects", "extractFmlSources", "genSrgs");
-        }
+        makeTask("obfuscateJar", ObfuscateTask.class, task -> {
+            task.setSrg(delayedFile(DevConstants.MCP_2_NOTCH_SRG));
+            task.setExc(delayedFile(DevConstants.SRG_EXC));
+            task.setReverse(false);
+            task.setPreFFJar(delayedFile(DevConstants.JAR_SRG_FML));
+            task.setOutJar(delayedFile(DevConstants.REOBF_TMP));
+            task.setBuildFile(delayedFile(DevConstants.ECLIPSE_FML + "/build.gradle"));
+            task.setMethodsCsv(delayedFile(DevConstants.METHODS_CSV));
+            task.setFieldsCsv(delayedFile(DevConstants.FIELDS_CSV));
+            task.dependsOn("generateProjects", "extractFmlSources", "genSrgs");
+        });
 
-        GenBinaryPatches task3 = makeTask("genBinPatches", GenBinaryPatches.class);
-        {
-            task3.setCleanClient(delayedFile(Constants.JAR_CLIENT_FRESH));
-            task3.setCleanServer(delayedFile(Constants.JAR_SERVER_FRESH));
-            task3.setCleanMerged(delayedFile(Constants.JAR_MERGED));
-            task3.setDirtyJar(delayedFile(DevConstants.REOBF_TMP));
-            task3.setDeobfDataLzma(delayedFile(DevConstants.DEOBF_DATA));
-            task3.setOutJar(delayedFile(DevConstants.BINPATCH_TMP));
-            task3.setSrg(delayedFile(DevConstants.NOTCH_2_SRG_SRG));
-            task3.addPatchList(delayedFileTree(DevConstants.FML_PATCH_DIR));
-            task3.dependsOn("obfuscateJar", "compressDeobfData");
-        }
+        makeTask("genBinPatches", GenBinaryPatches.class, task -> {
+            task.setCleanClient(delayedFile(Constants.JAR_CLIENT_FRESH));
+            task.setCleanServer(delayedFile(Constants.JAR_SERVER_FRESH));
+            task.setCleanMerged(delayedFile(Constants.JAR_MERGED));
+            task.setDirtyJar(delayedFile(DevConstants.REOBF_TMP));
+            task.setDeobfDataLzma(delayedFile(DevConstants.DEOBF_DATA));
+            task.setOutJar(delayedFile(DevConstants.BINPATCH_TMP));
+            task.setSrg(delayedFile(DevConstants.NOTCH_2_SRG_SRG));
+            task.addPatchList(delayedFileTree(DevConstants.FML_PATCH_DIR));
+            task.dependsOn("obfuscateJar", "compressDeobfData");
+        });
 
-        FMLVersionPropTask prop = makeTask("createVersionProperties", FMLVersionPropTask.class);
-        {
-            prop.getOutputs().upToDateWhen(Constants.SPEC_FALSE);
-            prop.setOutputFile(delayedFile(DevConstants.FML_VERSION));
-        }
+        makeTask("createVersionProperties", FMLVersionPropTask.class, task -> {
+            task.getOutputs().upToDateWhen(Constants.SPEC_FALSE);
+            task.setOutputFile(delayedFile(DevConstants.FML_VERSION));
+        });
     }
 
     private void createPackageTasks() {
-        CrowdinDownloadTask crowdin = makeTask("getLocalizations", CrowdinDownloadTask.class);
-        {
-            crowdin.setOutput(delayedFile(CROWDIN_ZIP));
-            crowdin.setProjectId(CROWDIN_FORGEID);
-            crowdin.setExtract(false);
-        }
+        makeTask("getLocalizations", CrowdinDownloadTask.class, task -> {
+            task.setOutput(delayedFile(CROWDIN_ZIP));
+            task.setProjectId(CROWDIN_FORGEID);
+            task.setExtract(false);
+        });
 
-        ChangelogTask makeChangelog = makeTask("createChangelog", ChangelogTask.class);
-        {
-            makeChangelog.getOutputs().upToDateWhen(Constants.SPEC_FALSE);
-            makeChangelog.setServerRoot(delayedString("{JENKINS_SERVER}"));
-            makeChangelog.setJobName(delayedString("{JENKINS_JOB}"));
-            makeChangelog.setAuthName(delayedString("{JENKINS_AUTH_NAME}"));
-            makeChangelog.setAuthPassword(delayedString("{JENKINS_AUTH_PASSWORD}"));
-            makeChangelog.setTargetBuild(delayedString("{BUILD_NUM}"));
-            makeChangelog.setOutput(delayedFile(DevConstants.CHANGELOG));
-        }
+        makeTask("createChangelog", ChangelogTask.class, task -> {
+            task.getOutputs().upToDateWhen(Constants.SPEC_FALSE);
+            task.setServerRoot(delayedString("{JENKINS_SERVER}"));
+            task.setJobName(delayedString("{JENKINS_JOB}"));
+            task.setAuthName(delayedString("{JENKINS_AUTH_NAME}"));
+            task.setAuthPassword(delayedString("{JENKINS_AUTH_PASSWORD}"));
+            task.setTargetBuild(delayedString("{BUILD_NUM}"));
+            task.setOutput(delayedFile(DevConstants.CHANGELOG));
+        });
 
-        final DelayedJar uni = makeTask("packageUniversal", DelayedJar.class);
-        {
-            ArchiveTaskHelper.setClassifier(uni, "universal");
-            uni.getInputs().file(delayedFile(DevConstants.JSON_REL));
-            uni.getOutputs().upToDateWhen(Constants.SPEC_FALSE);
-            uni.from(delayedZipTree(DevConstants.BINPATCH_TMP));
-            uni.from(delayedFileTree(DevConstants.FML_RESOURCES));
-            uni.from(delayedZipTree(DevConstants.CROWDIN_ZIP));
-            uni.from(delayedFile(DevConstants.FML_VERSION));
-            uni.from(delayedFile(DevConstants.FML_LICENSE));
-            uni.from(delayedFile(DevConstants.FML_CREDITS));
-            uni.from(delayedFile(DevConstants.DEOBF_DATA));
-            uni.from(delayedFile(DevConstants.CHANGELOG));
-            uni.exclude("devbinpatches.pack.lzma");
-            uni.setIncludeEmptyDirs(false);
-            uni.setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE);
-            uni.setManifest(new Action<Manifest>() {
+        final DelayedJar uni = makeTask("packageUniversal", DelayedJar.class, task -> {
+            ArchiveTaskHelper.setClassifier(task, "universal");
+            task.getInputs().file(delayedFile(DevConstants.JSON_REL));
+            task.getOutputs().upToDateWhen(Constants.SPEC_FALSE);
+            task.from(delayedZipTree(DevConstants.BINPATCH_TMP));
+            task.from(delayedFileTree(DevConstants.FML_RESOURCES));
+            task.from(delayedZipTree(DevConstants.CROWDIN_ZIP));
+            task.from(delayedFile(DevConstants.FML_VERSION));
+            task.from(delayedFile(DevConstants.FML_LICENSE));
+            task.from(delayedFile(DevConstants.FML_CREDITS));
+            task.from(delayedFile(DevConstants.DEOBF_DATA));
+            task.from(delayedFile(DevConstants.CHANGELOG));
+            task.exclude("devbinpatches.pack.lzma");
+            task.setIncludeEmptyDirs(false);
+            task.setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE);
+            task.setManifest(new Action<Manifest>() {
                 @Override
                 public void execute(Manifest manifest) {
                     manifest.getAttributes().put("Main-Class", delayedString("{MAIN_CLASS}").call());
@@ -376,122 +352,118 @@ public class FmlDevPlugin extends DevBasePlugin {
                     manifest.getAttributes().put("Class-Path", getServerClassPath(delayedFile(DevConstants.JSON_REL).call()));
                 }
             });
-            uni.dependsOn("genBinPatches", crowdin, makeChangelog, "createVersionProperties");
-        }
+            task.dependsOn("genBinPatches", "getLocalizations", "createChangelog", "createVersionProperties");
+        }).get();
+
         project.getArtifacts().add("archives", uni);
 
-        FileFilterTask genInstallJson = makeTask("generateInstallJson", FileFilterTask.class);
-        {
-            genInstallJson.setInputFile(delayedFile(DevConstants.JSON_REL));
-            genInstallJson.setOutputFile(delayedFile(DevConstants.INSTALL_PROFILE));
-            genInstallJson.addReplacement("@minecraft_version@", delayedString("{MC_VERSION}"));
-            genInstallJson.addReplacement("@version@", delayedString("{VERSION}"));
-            genInstallJson.addReplacement("@project@", delayedString("FML"));
-            genInstallJson.addReplacement("@artifact@", delayedString("cpw.mods:fml:{MC_VERSION_SAFE}-{VERSION}"));
-            genInstallJson.addReplacement("@universal_jar@", (Supplier<String>) () -> ArchiveTaskHelper.getArchiveName(uni));
-            genInstallJson.addReplacement("@timestamp@", (Supplier<String>) () -> (new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ")).format(new Date()));
-        }
+        makeTask("generateInstallJson", FileFilterTask.class, task -> {
+            task.setInputFile(delayedFile(DevConstants.JSON_REL));
+            task.setOutputFile(delayedFile(DevConstants.INSTALL_PROFILE));
+            task.addReplacement("@minecraft_version@", delayedString("{MC_VERSION}"));
+            task.addReplacement("@version@", delayedString("{VERSION}"));
+            task.addReplacement("@project@", delayedString("FML"));
+            task.addReplacement("@artifact@", delayedString("cpw.mods:fml:{MC_VERSION_SAFE}-{VERSION}"));
+            task.addReplacement("@universal_jar@", (Supplier<String>) () -> ArchiveTaskHelper.getArchiveName((AbstractArchiveTask) task.dependsOn("packageUniversal")));
+            task.addReplacement("@timestamp@", (Supplier<String>) () -> (new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ")).format(new Date()));
+        });
 
-        Zip inst = makeTask("packageInstaller", Zip.class);
-        {
-            ArchiveTaskHelper.setClassifier(inst,"installer");
-            inst.from((Callable<File>) () -> ArchiveTaskHelper.getArchivePath(uni));
-            inst.from(delayedFile(DevConstants.INSTALL_PROFILE));
-            inst.from(delayedFile(DevConstants.CHANGELOG));
-            inst.from(delayedFile(DevConstants.FML_LICENSE));
-            inst.from(delayedFile(DevConstants.FML_CREDITS));
-            inst.from(delayedFile(DevConstants.FML_LOGO));
-            inst.from(delayedZipTree(DevConstants.INSTALLER_BASE), new CopyInto("/", "!*.json", "!*.png"));
-            inst.dependsOn(uni, "downloadBaseInstaller", genInstallJson);
-            ArchiveTaskHelper.setExtension(inst,"jar");
-        }
+        Zip inst = makeTask("packageInstaller", Zip.class, task -> {
+            ArchiveTaskHelper.setClassifier(task, "installer");
+            task.from((Callable<File>) () -> ArchiveTaskHelper.getArchivePath((AbstractArchiveTask) task.dependsOn("packageUniversal")));
+            task.from(delayedFile(DevConstants.INSTALL_PROFILE));
+            task.from(delayedFile(DevConstants.CHANGELOG));
+            task.from(delayedFile(DevConstants.FML_LICENSE));
+            task.from(delayedFile(DevConstants.FML_CREDITS));
+            task.from(delayedFile(DevConstants.FML_LOGO));
+            task.from(delayedZipTree(DevConstants.INSTALLER_BASE), new CopyInto("/", "!*.json", "!*.png"));
+            task.dependsOn("downloadBaseInstaller", "generateInstallJson");
+            ArchiveTaskHelper.setExtension(task, "jar");
+        }).get();
+
         project.getArtifacts().add("archives", inst);
 
-        final Zip patchZip = makeTask("zipPatches", Zip.class);
-        {
-            patchZip.from(delayedFile(DevConstants.FML_PATCH_DIR));
-            ArchiveTaskHelper.setArchiveName(patchZip, "fmlpatches.zip");
-        }
+        makeTask("zipPatches", Zip.class, task -> {
+            task.from(delayedFile(DevConstants.FML_PATCH_DIR));
+            ArchiveTaskHelper.setArchiveName(task, "fmlpatches.zip");
+        });
 
-        final Zip classZip = makeTask("jarClasses", Zip.class);
-        {
-            classZip.from(delayedZipTree(DevConstants.BINPATCH_TMP), new CopyInto("", "**/*.class"));
-            ArchiveTaskHelper.setArchiveName(classZip, "binaries.jar");
-        }
+        makeTask("jarClasses", Zip.class, task -> {
+            task.from(delayedZipTree(DevConstants.BINPATCH_TMP), new CopyInto("", "**/*.class"));
+            ArchiveTaskHelper.setArchiveName(task, "binaries.jar");
+        });
 
-        ExtractS2SRangeTask range = makeTask("userDevExtractRange", ExtractS2SRangeTask.class);
-        {
-            range.setLibsFromProject(delayedFile(DevConstants.ECLIPSE_FML + "/build.gradle"), CONFIG_COMPILE, true);
-            range.addIn(delayedFile(DevConstants.FML_SOURCES));
-            range.setRangeMap(delayedFile(DevConstants.USERDEV_RANGEMAP));
-            range.dependsOn("generateProjects", "extractFmlSources");
-        }
+        makeTask("userDevExtractRange", ExtractS2SRangeTask.class, task -> {
+            task.setLibsFromProject(delayedFile(DevConstants.ECLIPSE_FML + "/build.gradle"), CONFIG_COMPILE, true);
+            task.addIn(delayedFile(DevConstants.FML_SOURCES));
+            task.setRangeMap(delayedFile(DevConstants.USERDEV_RANGEMAP));
+            task.dependsOn("generateProjects", "extractFmlSources");
+        });
 
-        ApplyS2STask s2s = makeTask("userDevSrgSrc", ApplyS2STask.class);
-        {
-            s2s.addIn(delayedFile(DevConstants.FML_SOURCES));
-            s2s.setOut(delayedFile(DevConstants.USERDEV_SRG_SRC));
-            s2s.addSrg(delayedFile(DevConstants.MCP_2_SRG_SRG));
-            s2s.addExc(delayedFile(DevConstants.JOINED_EXC));
-            s2s.setRangeMap(delayedFile(DevConstants.USERDEV_RANGEMAP));
-            s2s.dependsOn("genSrgs", range);
-            s2s.getOutputs().upToDateWhen(Constants.SPEC_FALSE); //Fucking caching.
+        makeTask("userDevSrgSrc", ApplyS2STask.class, task -> {
+            task.addIn(delayedFile(DevConstants.FML_SOURCES));
+            task.setOut(delayedFile(DevConstants.USERDEV_SRG_SRC));
+            task.addSrg(delayedFile(DevConstants.MCP_2_SRG_SRG));
+            task.addExc(delayedFile(DevConstants.JOINED_EXC));
+            task.setRangeMap(delayedFile(DevConstants.USERDEV_RANGEMAP));
+            task.dependsOn("genSrgs", "userDevExtractRange");
+            task.getOutputs().upToDateWhen(Constants.SPEC_FALSE); //Fucking caching.
 
             // find all the exc & srg files in the resources.
             for (File f : project.fileTree(delayedFile(DevConstants.FML_RESOURCES).call()).getFiles()) {
                 if (f.getPath().endsWith(".exc"))
-                    s2s.addExc(f);
+                    task.addExc(f);
                 else if (f.getPath().endsWith(".srg"))
-                    s2s.addSrg(f);
+                    task.addSrg(f);
             }
-        }
+        });
 
-        Zip userDev = makeTask("packageUserDev", Zip.class);
-        {
-            ArchiveTaskHelper.setClassifier(userDev,"userdev");
-            userDev.from(delayedFile(DevConstants.JSON_DEV));
-            userDev.from((Callable<File>) () -> ArchiveTaskHelper.getArchivePath(patchZip));
-            userDev.from((Callable<File>) () -> ArchiveTaskHelper.getArchivePath(classZip));
-            userDev.from(delayedFile(DevConstants.CHANGELOG));
-            userDev.from(delayedZipTree(DevConstants.BINPATCH_TMP), new CopyInto("", "devbinpatches.pack.lzma"));
-            userDev.from(delayedFileTree("{FML_DIR}/src/main/resources"), new CopyInto("src/main/resources"));
-            userDev.from(delayedZipTree(DevConstants.CROWDIN_ZIP), new CopyInto("src/main/resources"));
-            userDev.from(delayedFile(DevConstants.FML_VERSION), new CopyInto("src/main/resources"));
-            userDev.from(delayedZipTree(DevConstants.USERDEV_SRG_SRC), new CopyInto("src/main/java"));
-            userDev.from(delayedFile(DevConstants.DEOBF_DATA), new CopyInto("src/main/resources/"));
-            userDev.from(delayedFile(DevConstants.MERGE_CFG), new CopyInto("conf"));
-            userDev.from(delayedFileTree("{FML_CONF_DIR}"), new CopyInto("conf", "astyle.cfg", "exceptor.json", "*.csv", "!packages.csv"));
-            userDev.from(delayedFile(DevConstants.NOTCH_2_SRG_SRG), new CopyInto("conf"));
-            userDev.from(delayedFile(DevConstants.SRG_EXC), new CopyInto("conf"));
-            userDev.from(delayedFileTree("{FML_CONF_DIR}/patches"), new CopyInto("conf"));
-            userDev.rename(".+-dev\\.json", "dev.json");
-            userDev.rename(".+?\\.srg", "packaged.srg");
-            userDev.rename(".+?\\.exc", "packaged.exc");
-            userDev.setIncludeEmptyDirs(false);
-            uni.setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE);
-            userDev.dependsOn("packageUniversal", crowdin, patchZip, classZip, "createVersionProperties", s2s);
-            ArchiveTaskHelper.setExtension(userDev,"jar");
-        }
+        Zip userDev = makeTask("packageUserDev", Zip.class, task -> {
+            ArchiveTaskHelper.setClassifier(task,"userdev");
+            task.from(delayedFile(DevConstants.JSON_DEV));
+            task.from((Callable<File>) () -> ArchiveTaskHelper.getArchivePath((AbstractArchiveTask) task.dependsOn("zipPatches")));
+            task.from((Callable<File>) () -> ArchiveTaskHelper.getArchivePath((AbstractArchiveTask) task.dependsOn("jarClasses")));
+            task.from(delayedFile(DevConstants.CHANGELOG));
+            task.from(delayedZipTree(DevConstants.BINPATCH_TMP), new CopyInto("", "devbinpatches.pack.lzma"));
+            task.from(delayedFileTree("{FML_DIR}/src/main/resources"), new CopyInto("src/main/resources"));
+            task.from(delayedZipTree(DevConstants.CROWDIN_ZIP), new CopyInto("src/main/resources"));
+            task.from(delayedFile(DevConstants.FML_VERSION), new CopyInto("src/main/resources"));
+            task.from(delayedZipTree(DevConstants.USERDEV_SRG_SRC), new CopyInto("src/main/java"));
+            task.from(delayedFile(DevConstants.DEOBF_DATA), new CopyInto("src/main/resources/"));
+            task.from(delayedFile(DevConstants.MERGE_CFG), new CopyInto("conf"));
+            task.from(delayedFileTree("{FML_CONF_DIR}"), new CopyInto("conf", "astyle.cfg", "exceptor.json", "*.csv", "!packages.csv"));
+            task.from(delayedFile(DevConstants.NOTCH_2_SRG_SRG), new CopyInto("conf"));
+            task.from(delayedFile(DevConstants.SRG_EXC), new CopyInto("conf"));
+            task.from(delayedFileTree("{FML_CONF_DIR}/patches"), new CopyInto("conf"));
+            task.rename(".+-dev\\.json", "dev.json");
+            task.rename(".+?\\.srg", "packaged.srg");
+            task.rename(".+?\\.exc", "packaged.exc");
+            task.setIncludeEmptyDirs(false);
+            task.setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE);
+            task.dependsOn("packageUniversal", "getLocalizations", "createVersionProperties", "userDevSrgSrc");
+            ArchiveTaskHelper.setExtension(task,"jar");
+        }).get();
+
         project.getArtifacts().add("archives", userDev);
 
-        Zip src = makeTask("packageSrc", Zip.class);
-        {
-            ArchiveTaskHelper.setClassifier(src, "src");
-            src.from(delayedFile(DevConstants.CHANGELOG));
-            src.from(delayedFile(DevConstants.FML_LICENSE));
-            src.from(delayedFile(DevConstants.FML_CREDITS));
-            src.from(delayedFile("{FML_DIR}/install"), new CopyInto(null, "!*.gradle"));
-            src.from(delayedFile("{FML_DIR}/install"), (new CopyInto(null, "*.gradle"))
+        Zip src = makeTask("packageSrc", Zip.class, task -> {
+            ArchiveTaskHelper.setClassifier(task, "src");
+            task.from(delayedFile(DevConstants.CHANGELOG));
+            task.from(delayedFile(DevConstants.FML_LICENSE));
+            task.from(delayedFile(DevConstants.FML_CREDITS));
+            task.from(delayedFile("{FML_DIR}/install"), new CopyInto(null, "!*.gradle"));
+            task.from(delayedFile("{FML_DIR}/install"), (new CopyInto(null, "*.gradle"))
                     .addExpand("version", delayedString("{MC_VERSION_SAFE}-{VERSION}"))
                     .addExpand("mappings", delayedString("{MAPPING_CHANNEL_DOC}_{MAPPING_VERSION}"))
                     .addExpand("name", "fml"));
-            src.from(delayedFile("{FML_DIR}/gradlew"));
-            src.from(delayedFile("{FML_DIR}/gradlew.bat"));
-            src.from(delayedFile("{FML_DIR}/gradle/wrapper"), new CopyInto("gradle/wrapper"));
-            src.rename(".+?\\.gradle", "build.gradle");
-            src.dependsOn("createChangelog");
-            ArchiveTaskHelper.setExtension(src,"zip");
-        }
+            task.from(delayedFile("{FML_DIR}/gradlew"));
+            task.from(delayedFile("{FML_DIR}/gradlew.bat"));
+            task.from(delayedFile("{FML_DIR}/gradle/wrapper"), new CopyInto("gradle/wrapper"));
+            task.rename(".+?\\.gradle", "build.gradle");
+            task.dependsOn("createChangelog");
+            ArchiveTaskHelper.setExtension(task, "zip");
+        }).get();
+
         project.getArtifacts().add("archives", src);
     }
 
@@ -545,12 +517,14 @@ public class FmlDevPlugin extends DevBasePlugin {
     public void afterEvaluate() {
         super.afterEvaluate();
 
-        SubprojectTask task = (SubprojectTask) project.getTasks().getByName("eclipseClean");
-        task.configureProject(getExtension().getSubprojects());
-        task.configureProject(getExtension().getCleanProject());
+        this.<SubprojectTask>configureTask("eclipseClean", task -> {
+            task.configureProject(getExtension().getSubprojects());
+            task.configureProject(getExtension().getCleanProject());
+        });
 
-        task = (SubprojectTask) project.getTasks().getByName("eclipseFML");
-        task.configureProject(getExtension().getSubprojects());
-        task.configureProject(getExtension().getCleanProject());
+        this.<SubprojectTask>configureTask("eclipseFML", task -> {
+            task.configureProject(getExtension().getSubprojects());
+            task.configureProject(getExtension().getCleanProject());
+        });
     }
 }
